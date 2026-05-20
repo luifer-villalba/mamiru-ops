@@ -9,10 +9,10 @@ Backend interno para Mamiru – catálogo de productos, proveedores y categoría
 | Dependencia | Versión | Razón |
 |---|---|---|
 | Python | 3.12 | Versión estable y moderna, soportada por Railway, compatible con todas las dependencias. |
-| Django | 5.1.9 | Versión LTS actual (5.1.x), estable, ampliamente compatible. |
+| Django | 5.1.14 | Versión LTS actual (5.1.x), estable, ampliamente compatible. Incluye parches de seguridad contra SQL injection y DoS. |
 | Django REST Framework | 3.15.2 | Versión estable actual, compatible con Django 5.x. |
 | psycopg2-binary | 2.9.10 | Driver PostgreSQL estable para Python/Django. |
-| Pillow | 11.2.1 | Versión estable actual para soporte de imágenes. |
+| Pillow | 12.2.0 | Versión estable actual para soporte de imágenes. Incluye parches de seguridad contra OOB write y GZIP bomb. |
 | Gunicorn | 23.0.0 | Servidor WSGI estable para producción. |
 | WhiteNoise | 6.9.0 | Sirve archivos estáticos eficientemente sin servidor adicional. |
 | dj-database-url | 2.3.0 | Parsea `DATABASE_URL` para PostgreSQL en Railway y Docker. |
