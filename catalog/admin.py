@@ -10,7 +10,7 @@ from .models import Category, Product, ProductImage, Supplier
 
 admin.site.site_header = "Mamiru Ops"
 admin.site.site_title = "Mamiru Ops"
-admin.site.index_title = "Panel de administracion"
+admin.site.index_title = "Panel de administración"
 
 
 admin.site.unregister(User)
@@ -51,17 +51,26 @@ class ProductImageInline(TabularInline):
 
 @admin.register(Product)
 class ProductAdmin(ModelAdmin):
-    list_display = ["code", "name", "category", "supplier", "sale_price", "stock", "status"]
+    list_display = [
+        "code",
+        "name",
+        "category",
+        "supplier",
+        "sale_price",
+        "stock",
+        "status",
+    ]
     list_filter = ["category", "supplier", "status"]
     search_fields = ["code", "name"]
     prepopulated_fields = {"slug": ("name",)}
     inlines = [ProductImageInline]
-    readonly_fields = ["created_at", "updated_at"]
+    readonly_fields = ["code", "created_at", "updated_at"]
     fieldsets = [
         (
             "Identificación",
             {
                 "fields": ["code", "name", "slug", "status"],
+                "description": "El código se genera automáticamente al guardar.",
             },
         ),
         (

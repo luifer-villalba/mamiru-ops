@@ -95,7 +95,7 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 # Internationalization
-LANGUAGE_CODE = "es-py"
+LANGUAGE_CODE = "es"
 TIME_ZONE = "America/Asuncion"
 USE_I18N = True
 USE_TZ = True
@@ -132,7 +132,7 @@ REST_FRAMEWORK = {
 UNFOLD = {
     "SITE_TITLE": "Mamiru Ops",
     "SITE_HEADER": "Mamiru Ops",
-    "SITE_SUBHEADER": "Catalogo interno",
+    "SITE_SUBHEADER": "Catálogo interno",
     "SITE_SYMBOL": "storefront",
     "SITE_URL": "/admin/",
     "SHOW_HISTORY": True,
@@ -144,7 +144,7 @@ UNFOLD = {
         "show_all_applications": True,
         "navigation": [
             {
-                "title": "Catalogo",
+                "title": "Catálogo",
                 "separator": True,
                 "collapsible": False,
                 "items": [
@@ -154,7 +154,7 @@ UNFOLD = {
                         "link": reverse_lazy("admin:catalog_product_changelist"),
                     },
                     {
-                        "title": "Categorias",
+                        "title": "Categorías",
                         "icon": "category",
                         "link": reverse_lazy("admin:catalog_category_changelist"),
                     },

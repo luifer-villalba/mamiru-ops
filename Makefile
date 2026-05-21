@@ -9,92 +9,92 @@ SERVICE ?= web
 
 .PHONY: help env build up down restart logs ps check shell bash migrate makemigrations superuser test collectstatic import local-run local-migrate local-makemigrations local-superuser local-test local-shell
 
-help: ## Show available commands
-	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage: make <target>\n\nTargets:\n"} /^[a-zA-Z0-9_-]+:.*##/ {printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+help: ## Mostrar comandos disponibles
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUso: make <comando>\n\nComandos:\n"} /^[a-zA-Z0-9_-]+:.*##/ {printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-env: ## Create .env from .env.example if it does not exist
-	@echo "Checking .env file..."
+env: ## Crear .env desde .env.example si no existe
+	@echo "Revisando archivo .env..."
 	@test -f .env || cp .env.example .env
 
-build: ## Build Docker images
-	@echo "Building Docker images..."
+build: ## Construir imagenes Docker
+	@echo "Construyendo imagenes Docker..."
 	$(COMPOSE) build
 
-up: env ## Start Docker services in the background
-	@echo "Starting Docker services..."
+up: env ## Levantar servicios Docker en segundo plano
+	@echo "Levantando servicios Docker..."
 	$(COMPOSE) up --build -d
 
-down: ## Stop Docker services and remove orphan containers
-	@echo "Stopping Docker services..."
+down: ## Detener servicios Docker y remover contenedores huerfanos
+	@echo "Deteniendo servicios Docker..."
 	$(COMPOSE) down --remove-orphans
 
-restart: down up ## Restart Docker services
+restart: down up ## Reiniciar servicios Docker
 
-logs: ## Follow Docker logs
-	@echo "Following Docker logs..."
+logs: ## Ver logs de Docker en tiempo real
+	@echo "Mostrando logs de Docker..."
 	$(COMPOSE) logs -f
 
-ps: ## Show Docker services status
-	@echo "Showing Docker services status..."
+ps: ## Mostrar estado de servicios Docker
+	@echo "Mostrando estado de servicios Docker..."
 	$(COMPOSE) ps
 
-check: ## Run Django system checks in a temporary Docker container
-	@echo "Running Django system checks..."
+check: ## Ejecutar chequeos de Django en un contenedor temporal
+	@echo "Ejecutando chequeos de Django..."
 	$(COMPOSE) run --rm --no-deps --entrypoint python $(SERVICE) manage.py check
 
-shell: ## Open Django shell in Docker
-	@echo "Opening Django shell in Docker..."
+shell: ## Abrir shell de Django en Docker
+	@echo "Abriendo shell de Django en Docker..."
 	$(COMPOSE) exec $(SERVICE) $(MANAGE) shell
 
-bash: ## Open a shell inside the Docker web container
-	@echo "Opening shell inside Docker service $(SERVICE)..."
+bash: ## Abrir shell dentro del contenedor web
+	@echo "Abriendo shell dentro del servicio Docker $(SERVICE)..."
 	$(COMPOSE) exec $(SERVICE) sh
 
-migrate: ## Run Django migrations in Docker
-	@echo "Running Django migrations in Docker..."
+migrate: ## Ejecutar migraciones de Django en Docker
+	@echo "Ejecutando migraciones de Django en Docker..."
 	$(COMPOSE) exec $(SERVICE) $(MANAGE) migrate
 
-makemigrations: ## Create Django migrations in Docker
-	@echo "Creating Django migrations in Docker..."
+makemigrations: ## Crear migraciones de Django en Docker
+	@echo "Creando migraciones de Django en Docker..."
 	$(COMPOSE) exec $(SERVICE) $(MANAGE) makemigrations
 
-superuser: ## Create Django superuser in Docker
-	@echo "Creating Django superuser in Docker..."
+superuser: ## Crear superusuario de Django en Docker
+	@echo "Creando superusuario de Django en Docker..."
 	$(COMPOSE) exec $(SERVICE) $(MANAGE) createsuperuser
 
-test: ## Run Django tests in Docker
-	@echo "Running Django tests in Docker..."
+test: ## Ejecutar tests de Django en Docker
+	@echo "Ejecutando tests de Django en Docker..."
 	$(COMPOSE) exec $(SERVICE) $(MANAGE) test
 
-collectstatic: ## Collect static files in Docker
-	@echo "Collecting static files in Docker..."
+collectstatic: ## Recolectar archivos estaticos en Docker
+	@echo "Recolectando archivos estaticos en Docker..."
 	$(COMPOSE) exec $(SERVICE) $(MANAGE) collectstatic --noinput
 
-import: ## Import stock CSV in Docker. Usage: make import CSV=path/to/file.csv
-	@echo "Importing stock CSV in Docker..."
-	@test -n "$(CSV)" || (echo "Missing CSV. Usage: make import CSV=path/to/file.csv" && exit 1)
+import: ## Importar CSV de stock en Docker. Uso: make import CSV=ruta/archivo.csv
+	@echo "Importando CSV de stock en Docker..."
+	@test -n "$(CSV)" || (echo "Falta CSV. Uso: make import CSV=ruta/archivo.csv" && exit 1)
 	$(COMPOSE) exec $(SERVICE) $(MANAGE) import_mamiru_stock "$(CSV)"
 
-local-run: env ## Run Django development server locally
-	@echo "Starting Django development server locally..."
+local-run: env ## Levantar servidor de desarrollo local
+	@echo "Levantando servidor de desarrollo local..."
 	$(MANAGE) runserver
 
-local-migrate: env ## Run Django migrations locally
-	@echo "Running Django migrations locally..."
+local-migrate: env ## Ejecutar migraciones localmente
+	@echo "Ejecutando migraciones localmente..."
 	$(MANAGE) migrate
 
-local-makemigrations: env ## Create Django migrations locally
-	@echo "Creating Django migrations locally..."
+local-makemigrations: env ## Crear migraciones localmente
+	@echo "Creando migraciones localmente..."
 	$(MANAGE) makemigrations
 
-local-superuser: env ## Create Django superuser locally
-	@echo "Creating Django superuser locally..."
+local-superuser: env ## Crear superusuario localmente
+	@echo "Creando superusuario localmente..."
 	$(MANAGE) createsuperuser
 
-local-test: env ## Run Django tests locally
-	@echo "Running Django tests locally..."
+local-test: env ## Ejecutar tests localmente
+	@echo "Ejecutando tests localmente..."
 	$(MANAGE) test
 
-local-shell: env ## Open Django shell locally
-	@echo "Opening Django shell locally..."
+local-shell: env ## Abrir shell de Django localmente
+	@echo "Abriendo shell de Django localmente..."
 	$(MANAGE) shell

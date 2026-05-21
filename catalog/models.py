@@ -3,11 +3,11 @@ from django.utils.text import slugify
 
 
 class Supplier(models.Model):
-    name = models.CharField(max_length=200, unique=True)
-    contact_name = models.CharField(max_length=200, blank=True)
-    whatsapp = models.CharField(max_length=50, blank=True)
-    country = models.CharField(max_length=100, blank=True)
-    notes = models.TextField(blank=True)
+    name = models.CharField("Nombre", max_length=200, unique=True)
+    contact_name = models.CharField("Nombre de contacto", max_length=200, blank=True)
+    whatsapp = models.CharField("WhatsApp", max_length=50, blank=True)
+    country = models.CharField("País", max_length=100, blank=True)
+    notes = models.TextField("Notas", blank=True)
 
     class Meta:
         ordering = ["name"]
@@ -19,8 +19,8 @@ class Supplier(models.Model):
 
 
 class Category(models.Model):
-    name = models.CharField(max_length=200, unique=True)
-    slug = models.SlugField(max_length=200, unique=True)
+    name = models.CharField("Nombre", max_length=200, unique=True)
+    slug = models.SlugField("Slug", max_length=200, unique=True)
 
     class Meta:
         ordering = ["name"]
@@ -40,33 +40,48 @@ class Product(models.Model):
     class Status(models.TextChoices):
         DRAFT = "draft", "Borrador"
         ACTIVE = "active", "Activo"
-        SOLD_OUT = "sold_out", "Sin Stock"
+        SOLD_OUT = "sold_out", "Sin stock"
         HIDDEN = "hidden", "Oculto"
 
-    code = models.CharField(max_length=50, unique=True)
-    name = models.CharField(max_length=300)
-    slug = models.SlugField(max_length=300, unique=True)
+    code = models.CharField("Código", max_length=50, unique=True, blank=True)
+    name = models.CharField("Nombre", max_length=300)
+    slug = models.SlugField("Slug", max_length=300, unique=True)
     category = models.ForeignKey(
-        Category, on_delete=models.PROTECT, related_name="products"
+        Category,
+        verbose_name="Categoría",
+        on_delete=models.PROTECT,
+        related_name="products",
     )
     supplier = models.ForeignKey(
-        Supplier, on_delete=models.PROTECT, related_name="products"
+        Supplier,
+        verbose_name="Proveedor",
+        on_delete=models.PROTECT,
+        related_name="products",
     )
-    material = models.CharField(max_length=200, blank=True)
-    product_type = models.CharField(max_length=200, blank=True)
-    cost_price = models.PositiveIntegerField(default=0)
-    wholesale_cost = models.PositiveIntegerField(null=True, blank=True)
+    material = models.CharField("Material", max_length=200, blank=True)
+    product_type = models.CharField("Tipo de producto", max_length=200, blank=True)
+    cost_price = models.PositiveIntegerField("Costo", default=0)
+    wholesale_cost = models.PositiveIntegerField(
+        "Costo mayorista", null=True, blank=True
+    )
     margin_percent = models.DecimalField(
-        max_digits=6, decimal_places=2, null=True, blank=True
+        "Margen %",
+        max_digits=6,
+        decimal_places=2,
+        null=True,
+        blank=True,
     )
-    sale_price = models.PositiveIntegerField(default=0)
-    stock = models.PositiveIntegerField(default=0)
+    sale_price = models.PositiveIntegerField("Precio de venta", default=0)
+    stock = models.PositiveIntegerField("Stock", default=0)
     status = models.CharField(
-        max_length=20, choices=Status.choices, default=Status.DRAFT
+        "Estado",
+        max_length=20,
+        choices=Status.choices,
+        default=Status.DRAFT,
     )
-    notes = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    notes = models.TextField("Notas", blank=True)
+    created_at = models.DateTimeField("Creado", auto_now_add=True)
+    updated_at = models.DateTimeField("Actualizado", auto_now=True)
 
     class Meta:
         ordering = ["name"]
@@ -76,7 +91,32 @@ class Product(models.Model):
     def __str__(self):
         return f"[{self.code}] {self.name}"
 
+    @classmethod
+    def generate_code(cls) -> str:
+        last_code = (
+            cls.objects.filter(code__startswith="MAM-")
+            .order_by("-code")
+            .values_list("code", flat=True)
+            .first()
+        )
+        if not last_code:
+            return "MAM-0001"
+
+        try:
+            next_number = int(last_code.split("-")[1]) + 1
+        except (IndexError, ValueError):
+            next_number = cls.objects.filter(code__startswith="MAM-").count() + 1
+
+        code = f"MAM-{next_number:04d}"
+        while cls.objects.filter(code=code).exists():
+            next_number += 1
+            code = f"MAM-{next_number:04d}"
+        return code
+
     def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = self.generate_code()
+
         if not self.slug:
             base_slug = slugify(self.name)
             slug = base_slug
@@ -90,11 +130,14 @@ class Product(models.Model):
 
 class ProductImage(models.Model):
     product = models.ForeignKey(
-        Product, on_delete=models.CASCADE, related_name="images"
+        Product,
+        verbose_name="Producto",
+        on_delete=models.CASCADE,
+        related_name="images",
     )
-    image = models.ImageField(upload_to="products/")
-    is_main = models.BooleanField(default=False)
-    sort_order = models.PositiveIntegerField(default=0)
+    image = models.ImageField("Imagen", upload_to="products/")
+    is_main = models.BooleanField("Imagen principal", default=False)
+    sort_order = models.PositiveIntegerField("Orden", default=0)
 
     class Meta:
         ordering = ["sort_order", "id"]
