@@ -52,6 +52,11 @@ def clean_text(value: str) -> str:
     return " ".join(value.strip().split()) if value else ""
 
 
+def clean_row(row: dict) -> dict:
+    """Normaliza nombres de columnas y valores del CSV."""
+    return {clean_text(key): value for key, value in row.items() if key}
+
+
 def unique_slug(name: str, existing_slugs: set) -> str:
     base = slugify(name)
     slug = base
@@ -68,11 +73,23 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("csv_file", type=str, help="Ruta al archivo CSV")
+        parser.add_argument(
+            "--skip-existing",
+            action="store_true",
+            help="No actualiza productos existentes; solo crea los que falten.",
+        )
+        parser.add_argument(
+            "--seed-codes",
+            action="store_true",
+            help="Genera códigos determinísticos por fila para seeds idempotentes.",
+        )
 
     def handle(self, *args, **options):
         csv_path = Path(options["csv_file"])
         if not csv_path.exists():
             raise CommandError(f"Archivo no encontrado: {csv_path}")
+        skip_existing = options["skip_existing"]
+        seed_codes = options["seed_codes"]
 
         stats = {
             "created": 0,
@@ -89,6 +106,10 @@ class Command(BaseCommand):
             reader = csv.DictReader(fh)
             for row_number, row in enumerate(reader, start=2):
                 try:
+                    row = clean_row(row)
+                    if not any(clean_text(value) for value in row.values()):
+                        continue
+
                     code = clean_text(row.get("Codigo", ""))
                     name = clean_text(row.get("Producto", ""))
                     category_name = clean_text(
@@ -105,10 +126,6 @@ class Command(BaseCommand):
                     stock_raw = row.get("Stock Actual", "0")
 
                     if not name:
-                        self.stderr.write(
-                            f"Fila {row_number}: omitida porque falta el nombre del producto."
-                        )
-                        stats["errors"] += 1
                         continue
 
                     if not category_name:
@@ -141,11 +158,16 @@ class Command(BaseCommand):
 
                     if code:
                         product = Product.objects.filter(code=code).first()
+                    elif seed_codes:
+                        code = f"MAM-{row_number - 1:04d}"
+                        product = Product.objects.filter(code=code).first()
                     else:
                         product = None
                         code = Product.generate_code()
 
                     if product:
+                        if skip_existing:
+                            continue
                         product.name = name
                         product.category = category
                         product.supplier = supplier

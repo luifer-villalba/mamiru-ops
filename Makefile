@@ -4,10 +4,12 @@ COMPOSE ?= docker compose
 PYTHON ?= python
 MANAGE ?= $(PYTHON) manage.py
 SERVICE ?= web
+SEED_FILE ?= data/stock.csv
+DB_VOLUME ?= mamiru-ops_postgres_data
 
 .DEFAULT_GOAL := help
 
-.PHONY: help env build up down restart logs ps check shell bash migrate makemigrations superuser test collectstatic import local-run local-migrate local-makemigrations local-superuser local-test local-shell
+.PHONY: help env build up down restart logs ps check shell bash migrate makemigrations superuser test collectstatic import seed reset-db local-run local-migrate local-makemigrations local-superuser local-test local-shell
 
 help: ## Mostrar comandos disponibles
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUso: make <comando>\n\nComandos:\n"} /^[a-zA-Z0-9_-]+:.*##/ {printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -74,6 +76,16 @@ import: ## Importar CSV de stock en Docker. Uso: make import CSV=ruta/archivo.cs
 	@echo "Importando CSV de stock en Docker..."
 	@test -n "$(CSV)" || (echo "Falta CSV. Uso: make import CSV=ruta/archivo.csv" && exit 1)
 	$(COMPOSE) exec $(SERVICE) $(MANAGE) import_mamiru_stock "$(CSV)"
+
+seed: ## Importar stock inicial. Uso: make seed SEED_FILE=data/stock.csv
+	@echo "Importando stock inicial desde $(SEED_FILE)..."
+	$(COMPOSE) exec $(SERVICE) $(MANAGE) import_mamiru_stock "$(SEED_FILE)" --skip-existing --seed-codes
+
+reset-db: ## Resetear la base local de Docker sin borrar media
+	@echo "Reseteando base local de Docker..."
+	$(COMPOSE) down --remove-orphans
+	docker volume rm $(DB_VOLUME)
+	$(COMPOSE) up --build -d
 
 local-run: env ## Levantar servidor de desarrollo local
 	@echo "Levantando servidor de desarrollo local..."

@@ -1,0 +1,72 @@
+Codigo,Producto,Categoría,Material,Tipo ,Proveedor,Costo,Costo Mayorista,Margen %,Precio Venta,Stock Actual
+,Conjunto cadena + aros Luna,Conjunto,Acero,1,La Barca,"55,000Gs.","49,500Gs.",80%,"90,000Gs.",1
+,Conjunto cadena + aros Mariposa,Conjunto,Acero + nacar,1,La Barca,"56,000Gs.","50,400Gs.",80%,"91,000Gs.",1
+,Aros argolla,Aros,Acero,1,La Barca,"28,000Gs.","25,200Gs.",80%,"46,000Gs.",1
+,Aros argolla,Aros,Acero,1,La Barca,"30,000Gs.","27,000Gs.",80%,"49,000Gs.",1
+,Aros chicos,Aros,Acero,1,La Barca,"49,500Gs.","44,550Gs.",80%,"81,000Gs.",1
+,Aros chicos,Aros,Acero,1,La Barca,"38,000Gs.","34,200Gs.",80%,"62,000Gs.",1
+,Aros chicos,Aros,Acero,1,La Barca,"20,000Gs.","18,000Gs.",80%,"33,000Gs.",1
+,Aros chicos,Aros,Acero,1,La Barca,"38,000Gs.","34,200Gs.",80%,"62,000Gs.",1
+,Pulsera color oro,Pulsera,Acero,1,La Barca,"65,000Gs.","58,500Gs.",80%,"106,000Gs.",1
+,Pulsera color plata,Pulsera,Acero,1,La Barca,"68,000Gs.","61,200Gs.",80%,"111,000Gs.",1
+,Conjunto cadena + aros flores,Conjunto,Acero,2,Casa Paloma ,"60,000Gs.","42,000Gs.",80%,"76,000Gs.",1
+,Cadena plata,Cadena,Acero,2,Casa Paloma ,"60,000Gs.","42,000Gs.",80%,"76,000Gs.",1
+,Cadena plata corazon ,Cadena,Acero,2,Casa Paloma ,"40,000Gs.","28,000Gs.",80%,"51,000Gs.",1
+,Cadena 3 cristales,Cadena,Acero,1,Casa Paloma ,"70,000Gs.","49,000Gs.",80%,"89,000Gs.",1
+,Cadena con flor nacar,Cadena,Acero,1,Casa Paloma ,"90,000Gs.","63,000Gs.",80%,"114,000Gs.",1
+,Cadena trebol,Cadena,Acero,1,Casa Paloma ,"100,000Gs.","70,000Gs.",80%,"126,000Gs.",1
+,Cadena oro flor,Cadena,Acero,,Amore,"20,000Gs.","20,000Gs.",80%,"36,000Gs.",1
+,Pulsera flor negro,Pulsera,Acero,,Amore,"20,000Gs.","20,000Gs.",80%,"36,000Gs.",1
+,Cadena oro con dije,Cadena,Acero,,Amore,"23,000Gs.","23,000Gs.",80%,"42,000Gs.",1
+,Conjunto cadena + aros flor,Conjunto,Bijou,,Amore,"50,000Gs.","50,000Gs.",80%,"90,000Gs.",1
+,Cadena gato,Cadena,Acero,,Amore,"15,000Gs.","15,000Gs.",80%,"27,000Gs.",1
+,Cadena mariposa,Cadena,Acero,,Amore,"17,000Gs.","17,000Gs.",80%,"31,000Gs.",1
+,Cadena oro corazon,Cadena,Acero,,Amore,"22,000Gs.","22,000Gs.",80%,"40,000Gs.",1
+,Aros oro,Aros,Acero,,Amore,"30,000Gs.","30,000Gs.",80%,"54,000Gs.",1
+,Aros oro,Aros,Acero,,Amore,"45,000Gs.","45,000Gs.",80%,"81,000Gs.",1
+,Aros oro,Aros,Acero,,Amore,"30,000Gs.","30,000Gs.",80%,"54,000Gs.",1
+,Cadena pescadito,Cadena,Acero,,Amore,"15,000Gs.","15,000Gs.",80%,"27,000Gs.",1
+,Cadena oro ,Cadena,Acero,,Amore,"15,000Gs.","15,000Gs.",80%,"27,000Gs.",1
+,Cadena plata,Cadena,Acero,,Amore,"15,000Gs.","15,000Gs.",80%,"27,000Gs.",1
+,Conjunto cadena + aros flor oro,Conjunto,Acero,,Amore,"20,000Gs.","20,000Gs.",80%,"36,000Gs.",1
+,Conjunto cadena + aros flor negro,Conjunto,Acero,,Amore,"20,000Gs.","20,000Gs.",80%,"36,000Gs.",1
+,Pulsera color oro,Pulsera,Acero,,Amore,"30,000Gs.","30,000Gs.",80%,"54,000Gs.",1
+,Pulsera color oro,Pulsera,Acero,,Amore,"30,000Gs.","30,000Gs.",80%,"54,000Gs.",1
+,Pulsera color oro,Pulsera,Acero,,Amore,"30,000Gs.","30,000Gs.",80%,"54,000Gs.",1
+,Pulsera color plata,Pulsera,Acero,,Amore,"30,000Gs.","30,000Gs.",80%,"54,000Gs.",1
+,Pulsera color oro,Pulsera,Acero,,Amore,"20,000Gs.","20,000Gs.",80%,"36,000Gs.",1
+,Aros bebe,Aros,Acero,,Kims Bijouterie,"5,000Gs.","4,500Gs.",80%,"9,000Gs.",1
+,Aros bebe,Aros,Acero,,Kims Bijouterie,"5,000Gs.","4,500Gs.",80%,"9,000Gs.",1
+,Aros bebe,Aros,Acero,,Kims Bijouterie,"5,000Gs.","4,500Gs.",80%,"9,000Gs.",1
+,Aros bebe,Aros,Acero,,Kims Bijouterie,"5,000Gs.","4,500Gs.",80%,"9,000Gs.",1
+,Aros bebe,Aros,Acero,,Kims Bijouterie,"5,000Gs.","4,500Gs.",80%,"9,000Gs.",1
+,Aros oro,Aros,Acero,,Kims Bijouterie,"9,000Gs.","8,100Gs.",80%,"15,000Gs.",1
+,Aros oro,Aros,Acero,,Kims Bijouterie,"8,000Gs.","7,200Gs.",80%,"13,000Gs.",1
+,Aros oro,Aros,Acero,,Kims Bijouterie,"8,000Gs.","7,200Gs.",80%,"13,000Gs.",1
+,Aros oro,Aros,Acero,,Kims Bijouterie,"8,000Gs.","7,200Gs.",80%,"13,000Gs.",1
+,Aros oro,Aros,Acero,,Kims Bijouterie,"8,000Gs.","7,200Gs.",80%,"13,000Gs.",1
+,Aros oro,Aros,Acero,,Kims Bijouterie,"8,000Gs.","7,200Gs.",80%,"13,000Gs.",1
+,Aros oro,Aros,Acero,,Kims Bijouterie,"8,000Gs.","7,200Gs.",80%,"13,000Gs.",1
+,Aros oro flor con nacar,Aros,Acero,,Kims Bijouterie,"20,000Gs.","18,000Gs.",80%,"33,000Gs.",1
+,Aros oro flor,Aros,Acero,,Kims Bijouterie,"20,000Gs.","18,000Gs.",80%,"33,000Gs.",1
+,Set aros,Aros,Acero,,Kims Bijouterie,"13,000Gs.","11,700Gs.",80%,"22,000Gs.",1
+,Set aros,Aros,Acero,,Kims Bijouterie,"15,000Gs.","13,500Gs.",80%,"25,000Gs.",1
+,Set aros,Aros,Acero,,Kims Bijouterie,"15,000Gs.","13,500Gs.",80%,"25,000Gs.",1
+,Pulsera ,Pulsera,Acero,,Kims Bijouterie,"18,000Gs.","16,200Gs.",80%,"30,000Gs.",1
+,Pulsera flor con nacar,Pulsera,Acero,,Kims Bijouterie,"12,000Gs.","10,800Gs.",80%,"20,000Gs.",1
+,Pulsera con piedra naranja ,Pulsera,Acero,,Kims Bijouterie,"16,000Gs.","14,400Gs.",80%,"26,000Gs.",1
+,Pulsera plata,Pulsera,Acero,,Kims Bijouterie,"18,000Gs.","16,200Gs.",80%,"30,000Gs.",1
+,Pulsera carita,Pulsera,Acero,,Kims Bijouterie,"18,000Gs.","16,200Gs.",80%,"30,000Gs.",1
+,Pulsera perla y mariposa ,Pulsera,Acero,,Kims Bijouterie,"18,000Gs.","16,200Gs.",80%,"30,000Gs.",1
+,Cadena nene,Cadena ,Acero,,Kims Bijouterie,"12,000Gs.","21,600Gs.",80%,"39,000Gs.",2
+,Cadena nena,Cadena ,Acero,,Kims Bijouterie,"12,000Gs.","10,800Gs.",80%,"20,000Gs.",1
+,Cadena nena,Cadena ,Acero,,Kims Bijouterie,"16,000Gs.","14,400Gs.",80%,"26,000Gs.",1
+,Cadena nene,Cadena ,Acero,,Kims Bijouterie,"16,000Gs.","14,400Gs.",80%,"26,000Gs.",1
+,Collar Luna y sol,Cadena,Bijou,,Kims Bijouterie,"26,000Gs.","23,400Gs.",80%,"43,000Gs.",1
+,Collar negro flor,Cadena,Bijou,,Kims Bijouterie,"26,000Gs.","23,400Gs.",80%,"43,000Gs.",1
+,Conjunto cadena + aros perrito,Conjunto,Acero,,Kims Bijouterie,"18,000Gs.","16,200Gs.",80%,"30,000Gs.",1
+,Cadena Luna y sol,Cadena,Acero,,Kims Bijouterie,"17,000Gs.","15,300Gs.",80%,"28,000Gs.",1
+,Cadena cruz ,Cadena,Acero,,Kims Bijouterie,"17,000Gs.","15,300Gs.",80%,"28,000Gs.",1
+,Cadena trebol nacar,Cadena,Acero,,Kims Bijouterie,"18,000Gs.","16,200Gs.",80%,"30,000Gs.",1
+,Cadena trebol,Cadena,Acero,,Kims Bijouterie,"18,000Gs.","16,200Gs.",80%,"30,000Gs.",1
+,,,,,,,"1,619,450Gs.",,"2,944,000Gs.",

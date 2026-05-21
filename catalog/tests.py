@@ -9,6 +9,7 @@ class ProductCodeTests(TestCase):
         self.supplier = Supplier.objects.create(name="Proveedor")
 
     def test_product_code_is_generated_when_empty(self):
+        next_code = Product.generate_code()
         product = Product.objects.create(
             name="Producto sin código",
             slug="producto-sin-codigo",
@@ -16,10 +17,11 @@ class ProductCodeTests(TestCase):
             supplier=self.supplier,
         )
 
-        self.assertEqual(product.code, "MAM-0001")
+        self.assertEqual(product.code, next_code)
 
     def test_product_code_keeps_incrementing(self):
-        Product.objects.create(
+        first_code = Product.generate_code()
+        first_product = Product.objects.create(
             name="Producto uno",
             slug="producto-uno",
             category=self.category,
@@ -32,4 +34,6 @@ class ProductCodeTests(TestCase):
             supplier=self.supplier,
         )
 
-        self.assertEqual(product.code, "MAM-0002")
+        expected_number = int(first_code.split("-")[1]) + 1
+        self.assertEqual(first_product.code, first_code)
+        self.assertEqual(product.code, f"MAM-{expected_number:04d}")
