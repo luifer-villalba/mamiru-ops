@@ -61,7 +61,7 @@ ROOT_URLCONF = "config.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -136,6 +136,7 @@ UNFOLD = {
     "SITE_SYMBOL": "storefront",
     "SITE_URL": "/admin/",
     "SHOW_HISTORY": True,
+    "DASHBOARD_CALLBACK": "catalog.dashboard.admin_dashboard_callback",
     "SHOW_VIEW_ON_SITE": False,
     "SHOW_BACK_BUTTON": True,
     "BORDER_RADIUS": "6px",

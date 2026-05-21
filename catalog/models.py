@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 from django.utils.text import slugify
 
 
@@ -84,7 +85,7 @@ class Product(models.Model):
     updated_at = models.DateTimeField("Actualizado", auto_now=True)
 
     class Meta:
-        ordering = ["name"]
+        ordering = ["code", "name"]
         verbose_name = "Producto"
         verbose_name_plural = "Productos"
 
@@ -93,24 +94,23 @@ class Product(models.Model):
 
     @classmethod
     def generate_code(cls) -> str:
-        last_code = (
-            cls.objects.filter(code__startswith="MAM-")
-            .order_by("-code")
-            .values_list("code", flat=True)
-            .first()
+        year_prefix = timezone.now().strftime("%y")
+        current_year_codes = cls.objects.filter(code__startswith=year_prefix).values_list(
+            "code", flat=True
         )
-        if not last_code:
-            return "MAM-0001"
 
-        try:
-            next_number = int(last_code.split("-")[1]) + 1
-        except (IndexError, ValueError):
-            next_number = cls.objects.filter(code__startswith="MAM-").count() + 1
+        max_sequence = 0
+        for existing_code in current_year_codes:
+            if len(existing_code) == 6 and existing_code.isdigit():
+                sequence = int(existing_code[2:])
+                if sequence > max_sequence:
+                    max_sequence = sequence
 
-        code = f"MAM-{next_number:04d}"
+        next_number = max_sequence + 1
+        code = f"{year_prefix}{next_number:04d}"
         while cls.objects.filter(code=code).exists():
             next_number += 1
-            code = f"MAM-{next_number:04d}"
+            code = f"{year_prefix}{next_number:04d}"
         return code
 
     def save(self, *args, **kwargs):

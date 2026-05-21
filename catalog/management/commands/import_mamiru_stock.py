@@ -11,6 +11,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
+from django.utils import timezone
 from django.utils.text import slugify
 
 from catalog.models import Category, Product, Supplier
@@ -159,7 +160,8 @@ class Command(BaseCommand):
                     if code:
                         product = Product.objects.filter(code=code).first()
                     elif seed_codes:
-                        code = f"MAM-{row_number - 1:04d}"
+                        year_prefix = timezone.now().strftime("%y")
+                        code = f"{year_prefix}{row_number - 1:04d}"
                         product = Product.objects.filter(code=code).first()
                     else:
                         product = None

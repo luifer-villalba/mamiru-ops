@@ -1,4 +1,5 @@
 from django.test import TestCase
+from django.utils import timezone
 
 from .models import Category, Product, Supplier
 
@@ -34,6 +35,8 @@ class ProductCodeTests(TestCase):
             supplier=self.supplier,
         )
 
-        expected_number = int(first_code.split("-")[1]) + 1
+        current_year = timezone.now().strftime("%y")
+        expected_number = int(first_code[2:]) + 1
         self.assertEqual(first_product.code, first_code)
-        self.assertEqual(product.code, f"MAM-{expected_number:04d}")
+        self.assertTrue(first_product.code.startswith(current_year))
+        self.assertEqual(product.code, f"{current_year}{expected_number:04d}")
