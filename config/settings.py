@@ -23,7 +23,16 @@ if not DEBUG and (not SECRET_KEY or SECRET_KEY == _INSECURE_KEY):
         "SECRET_KEY must be set to a secure value when DEBUG is False."
     )
 
-ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+    if host.strip()
+]
+
+for railway_host_var in ("RAILWAY_PUBLIC_DOMAIN", "RAILWAY_PRIVATE_DOMAIN"):
+    railway_host = os.environ.get(railway_host_var, "").strip()
+    if railway_host and railway_host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(railway_host)
 
 CSRF_TRUSTED_ORIGINS = [
     origin.strip()
