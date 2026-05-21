@@ -29,6 +29,9 @@ ALLOWED_HOSTS = [
     if host.strip()
 ]
 
+if "100.64.0.2" not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append("100.64.0.2")
+
 for railway_host_var in ("RAILWAY_PUBLIC_DOMAIN", "RAILWAY_PRIVATE_DOMAIN"):
     railway_host = os.environ.get(railway_host_var, "").strip()
     if railway_host and railway_host not in ALLOWED_HOSTS:
