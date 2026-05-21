@@ -7,6 +7,7 @@ Usage:
 
 import csv
 import re
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
@@ -37,17 +38,17 @@ def clean_price(value: str) -> int:
         return 0
 
 
-def clean_percent(value: str) -> float | None:
-    """Convert margin percent string like "25%" or "25,5" to float. Returns None if empty."""
+def clean_percent(value: str) -> Decimal | None:
+    """Convert margin percent string like "25%" or "25,5" to Decimal. Returns None if empty."""
     if not value:
         return None
-    cleaned = re.sub(r"[^\d,\.]", "", value.strip())
+    cleaned = re.sub(r"[^\d,.]", "", value.strip())
     if not cleaned:
         return None
     cleaned = cleaned.replace(",", ".")
     try:
-        return float(cleaned)
-    except ValueError:
+        return Decimal(cleaned).quantize(Decimal("0.01"))
+    except InvalidOperation:
         return None
 
 
@@ -92,6 +93,7 @@ class Command(BaseCommand):
 
         # Pre-load existing slugs to avoid duplicates during import
         existing_slugs: set = set(Product.objects.values_list("slug", flat=True))
+        existing_category_slugs: set = set(Category.objects.values_list("slug", flat=True))
 
         # Track next auto-code counter
         max_auto = (
@@ -140,9 +142,10 @@ class Command(BaseCommand):
                     # --- Ensure category exists ---
                     if not category_name:
                         category_name = "Sin categoría"
+                    category_slug = unique_slug(category_name, existing_category_slugs)
                     category, cat_created = Category.objects.get_or_create(
                         name=category_name,
-                        defaults={"slug": slugify(category_name)},
+                        defaults={"slug": category_slug},
                     )
                     if cat_created:
                         stats["categories_created"] += 1

@@ -11,13 +11,16 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get(
-    "SECRET_KEY",
-    "django-insecure-change-me-in-production",
-)
+_INSECURE_KEY = "django-insecure-change-me-in-production"
+SECRET_KEY = os.environ.get("SECRET_KEY", _INSECURE_KEY)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DEBUG", "False") == "True"
+
+if not DEBUG and (not SECRET_KEY or SECRET_KEY == _INSECURE_KEY):
+    raise RuntimeError(
+        "SECRET_KEY must be set to a secure value when DEBUG is False."
+    )
 
 ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
@@ -98,7 +101,14 @@ USE_TZ = True
 # Static files
 STATIC_URL = os.environ.get("STATIC_URL", "/static/")
 STATIC_ROOT = os.environ.get("STATIC_ROOT", str(BASE_DIR / "staticfiles"))
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 # Media files (uploaded images)
 MEDIA_URL = os.environ.get("MEDIA_URL", "/media/")
