@@ -3,6 +3,7 @@ from pathlib import Path
 
 import dj_database_url
 from dotenv import load_dotenv
+from django.urls import reverse_lazy
 
 # Load .env file if present (development only)
 load_dotenv()
@@ -33,6 +34,7 @@ CSRF_TRUSTED_ORIGINS = [
 # Application definition
 
 INSTALLED_APPS = [
+    "unfold",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -124,4 +126,62 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,
+}
+
+# Unfold admin theme
+UNFOLD = {
+    "SITE_TITLE": "Mamiru Ops",
+    "SITE_HEADER": "Mamiru Ops",
+    "SITE_SUBHEADER": "Catalogo interno",
+    "SITE_SYMBOL": "storefront",
+    "SITE_URL": "/admin/",
+    "SHOW_HISTORY": True,
+    "SHOW_VIEW_ON_SITE": False,
+    "SHOW_BACK_BUTTON": True,
+    "BORDER_RADIUS": "6px",
+    "SIDEBAR": {
+        "show_search": True,
+        "show_all_applications": True,
+        "navigation": [
+            {
+                "title": "Catalogo",
+                "separator": True,
+                "collapsible": False,
+                "items": [
+                    {
+                        "title": "Productos",
+                        "icon": "inventory_2",
+                        "link": reverse_lazy("admin:catalog_product_changelist"),
+                    },
+                    {
+                        "title": "Categorias",
+                        "icon": "category",
+                        "link": reverse_lazy("admin:catalog_category_changelist"),
+                    },
+                    {
+                        "title": "Proveedores",
+                        "icon": "local_shipping",
+                        "link": reverse_lazy("admin:catalog_supplier_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": "Sistema",
+                "separator": True,
+                "collapsible": True,
+                "items": [
+                    {
+                        "title": "Usuarios",
+                        "icon": "people",
+                        "link": reverse_lazy("admin:auth_user_changelist"),
+                    },
+                    {
+                        "title": "Grupos",
+                        "icon": "groups",
+                        "link": reverse_lazy("admin:auth_group_changelist"),
+                    },
+                ],
+            },
+        ],
+    },
 }
