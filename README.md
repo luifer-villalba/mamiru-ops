@@ -133,14 +133,14 @@ docker compose exec web python manage.py createsuperuser
 
 Los servicios quedan disponibles en:
 - Web: http://localhost:8000
-- Admin: http://localhost:8000/admin/
+- Admin: http://localhost:8000/
 - API: http://localhost:8000/api/
 
 ---
 
 ## 8. Entrar al Django Admin
 
-Abrí http://localhost:8000/admin/ e ingresá con el superusuario creado.
+Abrí http://localhost:8000/ e ingresá con el superusuario creado.
 
 Desde el admin podés:
 - Crear/editar proveedores, categorías y productos.
@@ -167,7 +167,63 @@ curl http://localhost:8000/api/suppliers/
 
 ---
 
-## 10. Deploy en Railway
+## 10. Correr pruebas
+
+```bash
+python manage.py check
+python manage.py test
+```
+
+Si tu `.env` local apunta a PostgreSQL y no lo tenés levantado, podés correr las pruebas con SQLite temporal:
+
+```bash
+DATABASE_URL=sqlite:////tmp/mamiru-ops-test.sqlite3 python manage.py test
+```
+
+---
+
+## Git flow mínimo
+
+1. Actualizá `main` antes de empezar:
+
+```bash
+git switch main
+git pull
+```
+
+2. Creá una rama corta por cambio:
+
+```bash
+git switch -c feature/dashboard-productos
+```
+
+3. Revisá y probá antes de commitear:
+
+```bash
+git status
+git diff
+python manage.py check
+python manage.py test
+```
+
+4. Commits chicos y descriptivos:
+
+```bash
+git add .
+git commit -m "Show products on admin dashboard"
+```
+
+5. Subí la rama y abrí un PR/review:
+
+```bash
+git push -u origin feature/dashboard-productos
+```
+
+En el review conviene mirar: cambios de modelos/migraciones, templates del admin, variables de entorno, y resultado de `check` + `test`.
+
+---
+
+## 11. Deploy en Railway
 
 ### Requisitos previos
 - Cuenta en [Railway](https://railway.app/)
@@ -181,13 +237,13 @@ railway init
 railway up
 ```
 
-### 11. Configurar PostgreSQL en Railway
+### 12. Configurar PostgreSQL en Railway
 
 1. En el dashboard de Railway, agregá un servicio **PostgreSQL**.
 2. Railway genera automáticamente la variable `DATABASE_URL`.
 3. Vinculá esa variable a tu servicio web.
 
-### 12. Configurar variables de entorno en Railway
+### 13. Configurar variables de entorno en Railway
 
 En el dashboard de Railway → tu servicio → Variables, configurá:
 

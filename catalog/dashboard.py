@@ -4,6 +4,10 @@ from django.urls import reverse
 from catalog.models import Product
 
 
+def _format_guarani(value):
+    return f"₲ {int(value):,}".replace(",", ".")
+
+
 def admin_dashboard_callback(request, context):
     metrics = Product.objects.aggregate(
         total=Count("id"),
@@ -14,6 +18,7 @@ def admin_dashboard_callback(request, context):
     )
 
     changelist_url = reverse("admin:catalog_product_changelist")
+    add_url = reverse("admin:catalog_product_add")
     avg_margin = metrics["avg_margin"] or 0
 
     context["dashboard_metrics"] = [
@@ -41,6 +46,24 @@ def admin_dashboard_callback(request, context):
             "description": "Promedio actual de margen",
             "url": f"{changelist_url}?margin_percent__isnull=0",
         },
+    ]
+    context["product_changelist_url"] = changelist_url
+    context["product_add_url"] = add_url
+    context["dashboard_products"] = [
+        {
+            "code": product.code,
+            "name": product.name,
+            "category": product.category.name,
+            "supplier": product.supplier.name,
+            "stock": product.stock,
+            "status": product.get_status_display(),
+            "status_value": product.status,
+            "price": _format_guarani(product.sale_price),
+            "url": reverse("admin:catalog_product_change", args=[product.pk]),
+        }
+        for product in Product.objects.select_related("category", "supplier").order_by(
+            "code", "name"
+        )[:25]
     ]
 
     return context
