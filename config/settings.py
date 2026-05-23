@@ -151,6 +151,7 @@ UNFOLD = {
     "SITE_SUBHEADER": "Catálogo interno",
     "SITE_SYMBOL": "storefront",
     "SITE_URL": None,
+    "THEME": "light",
     "SHOW_HISTORY": True,
     "DASHBOARD_CALLBACK": "catalog.dashboard.admin_dashboard_callback",
     "SHOW_VIEW_ON_SITE": False,
