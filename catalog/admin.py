@@ -7,7 +7,7 @@ from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import Group, User
 from django import forms
-from django.utils.html import format_html
+from django.forms.models import BaseModelFormSet
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 
@@ -109,6 +109,12 @@ class ProductAdminForm(forms.ModelForm):
             self.initial["sale_price"] = format_guarani(self.instance.sale_price)
 
 
+class ProductChangeListForm(forms.ModelForm):
+    class Meta:
+        model = Product
+        fields = "__all__"
+
+
 admin.site.site_header = "Mamiru Ops"
 admin.site.site_title = "Mamiru Ops"
 admin.site.index_title = "Panel de administración"
@@ -168,17 +174,52 @@ class StockLevelFilter(admin.SimpleListFilter):
         return queryset
 
 
+class ProductChangeListFormSet(BaseModelFormSet):
+    def save_existing(self, form, obj, commit=True):
+        product = form.save(commit=False)
+        changed_fields = set(form.changed_data)
+
+        if "sale_price" in changed_fields and product.cost_price:
+            product.margin_percent = calculate_margin_percent(
+                product.cost_price,
+                product.sale_price,
+            )
+        elif changed_fields.intersection({"cost_price", "margin_percent"}):
+            if product.margin_percent is not None:
+                product.sale_price = calculate_sale_price(
+                    product.cost_price,
+                    product.margin_percent,
+                )
+
+        if commit:
+            product.save()
+            form.save_m2m()
+
+        return product
+
+
 @admin.register(Product)
 class ProductAdmin(ModelAdmin):
     form = ProductAdminForm
     list_display = [
         "code",
         "name",
-        "category",
+        "stock",
+        "sale_price",
+        "cost_price",
+        "margin_percent",
         "supplier",
-        "formatted_sale_price",
-        "stock_badge",
-        "status_badge",
+        "category",
+        "status",
+    ]
+    list_editable = [
+        "stock",
+        "sale_price",
+        "cost_price",
+        "margin_percent",
+        "supplier",
+        "category",
+        "status",
     ]
     list_filter = [StockLevelFilter, "category", "supplier", "status"]
     list_per_page = 25
@@ -234,43 +275,12 @@ class ProductAdmin(ModelAdmin):
         queryset = super().get_queryset(request)
         return queryset.select_related("category", "supplier")
 
-    @admin.display(description="Precio de venta", ordering="sale_price")
-    def formatted_sale_price(self, obj):
-        value = f"{obj.sale_price:,}".replace(",", ".")
-        return f"₲ {value}"
+    def get_changelist_formset(self, request, **kwargs):
+        kwargs["formset"] = ProductChangeListFormSet
+        return super().get_changelist_formset(request, **kwargs)
 
-    @admin.display(description="Stock", ordering="stock")
-    def stock_badge(self, obj):
-        if obj.stock == 0:
-            classes = "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300"
-            label = "Sin stock"
-        elif obj.stock < 5:
-            classes = "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-300"
-            label = f"{obj.stock} disp."
-        else:
-            classes = "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300"
-            label = f"{obj.stock} disp."
-
-        return format_html(
-            '<span class="rounded-default px-2 py-1 text-xs font-medium {}">{}</span>',
-            classes,
-            label,
-        )
-
-    @admin.display(description="Estado", ordering="status")
-    def status_badge(self, obj):
-        styles = {
-            Product.Status.ACTIVE: "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300",
-            Product.Status.SOLD_OUT: "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300",
-            Product.Status.HIDDEN: "bg-base-100 text-base-700 dark:bg-base-800 dark:text-base-300",
-            Product.Status.DRAFT: "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-300",
-        }
-
-        return format_html(
-            '<span class="rounded-default px-2 py-1 text-xs font-medium {}">{}</span>',
-            styles.get(obj.status, styles[Product.Status.DRAFT]),
-            obj.get_status_display(),
-        )
+    def get_changelist_form(self, request, **kwargs):
+        return ProductChangeListForm
 
     @admin.action(description="Marcar seleccionados como Activo")
     def mark_as_active(self, request, queryset):

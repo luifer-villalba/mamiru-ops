@@ -72,7 +72,7 @@ class Product(models.Model):
         null=True,
         blank=True,
     )
-    sale_price = models.PositiveIntegerField("Precio de venta", default=0)
+    sale_price = models.PositiveIntegerField("Precio", default=0)
     stock = models.PositiveIntegerField("Stock", default=0)
     status = models.CharField(
         "Estado",

@@ -107,6 +107,10 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
+AUTHENTICATION_BACKENDS = [
+    "config.auth_backends.UsernameOrEmailBackend",
+]
+
 # Internationalization
 LANGUAGE_CODE = "es"
 LANGUAGES = [
@@ -158,6 +162,9 @@ UNFOLD = {
     "SHOW_VIEW_ON_SITE": False,
     "SHOW_BACK_BUTTON": True,
     "BORDER_RADIUS": "6px",
+    "LOGIN": {
+        "form": "config.forms.UsernameOrEmailAuthenticationForm",
+    },
     "SIDEBAR": {
         "show_search": True,
         "show_all_applications": True,
