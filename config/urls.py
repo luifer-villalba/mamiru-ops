@@ -13,6 +13,7 @@ urlpatterns = [
     path("healthz/", healthz),
     path("admin/", RedirectView.as_view(url=reverse_lazy("admin:index"), permanent=True)),
     path("api/", include("catalog.urls")),
+    path("", RedirectView.as_view(url=reverse_lazy("admin:catalog_product_changelist"), permanent=False)),
     path("", admin.site.urls),
 ]
 

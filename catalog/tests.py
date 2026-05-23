@@ -1,8 +1,10 @@
+from decimal import Decimal
+
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from catalog.dashboard import admin_dashboard_callback
+from catalog.admin import ProductAdminForm
 
 from .models import Category, Product, Supplier
 
@@ -45,53 +47,83 @@ class ProductCodeTests(TestCase):
         self.assertEqual(product.code, f"{current_year}{expected_number:04d}")
 
 
-class AdminDashboardTests(TestCase):
-    def setUp(self):
-        Product.objects.all().delete()
-        Category.objects.all().delete()
-        Supplier.objects.all().delete()
+class AdminHomeTests(TestCase):
+    def test_admin_root_redirects_to_product_changelist(self):
+        response = self.client.get("/")
 
-        self.category = Category.objects.create(name="Test Aros", slug="test-aros")
-        self.supplier = Supplier.objects.create(name="Test Mamiru")
-
-    def create_product(self, **overrides):
-        defaults = {
-            "name": "Aro dorado",
-            "slug": "aro-dorado",
-            "category": self.category,
-            "supplier": self.supplier,
-            "sale_price": 55000,
-            "stock": 8,
-            "status": Product.Status.ACTIVE,
-        }
-        defaults.update(overrides)
-        return Product.objects.create(**defaults)
-
-    def test_dashboard_context_includes_metrics_and_products(self):
-        product = self.create_product()
-        context = admin_dashboard_callback(None, {})
-
-        self.assertEqual(context["dashboard_metrics"][0]["value"], 1)
-        self.assertEqual(context["dashboard_products"][0]["name"], product.name)
-        self.assertEqual(context["dashboard_products"][0]["price"], "₲ 55.000")
-        self.assertEqual(
-            context["dashboard_products"][0]["url"],
-            reverse("admin:catalog_product_change", args=[product.pk]),
-        )
-        self.assertEqual(
-            context["product_changelist_url"],
+        self.assertRedirects(
+            response,
             reverse("admin:catalog_product_changelist"),
+            fetch_redirect_response=False,
         )
-        self.assertEqual(context["product_add_url"], reverse("admin:catalog_product_add"))
 
-    def test_dashboard_limits_products_to_first_25(self):
-        for index in range(30):
-            self.create_product(
-                name=f"Producto {index:02d}",
-                slug=f"producto-{index:02d}",
+    def test_product_admin_uses_pagination(self):
+        from catalog.admin import ProductAdmin
+
+        self.assertEqual(ProductAdmin.list_per_page, 25)
+
+    def test_product_admin_uses_visual_badges(self):
+        from catalog.admin import ProductAdmin
+
+        self.assertIn("stock_badge", ProductAdmin.list_display)
+        self.assertIn("status_badge", ProductAdmin.list_display)
+        self.assertNotIn("stock", ProductAdmin.list_display)
+        self.assertNotIn("status", ProductAdmin.list_display)
+
+    def test_product_admin_renders_price_sync_source_field(self):
+        from catalog.admin import ProductAdmin
+
+        price_fields = ProductAdmin.fieldsets[2][1]["fields"]
+        self.assertIn("price_sync_source", price_fields)
+
+
+class ProductAdminFormPriceSyncTests(TestCase):
+    def setUp(self):
+        self.category = Category.objects.create(name="Formulario", slug="formulario")
+        self.supplier = Supplier.objects.create(name="Proveedor formulario")
+
+    def form_data(self, **overrides):
+        data = {
+            "name": "Producto formulario",
+            "slug": "producto-formulario",
+            "category": self.category.pk,
+            "supplier": self.supplier.pk,
+            "material": "",
+            "product_type": "",
+            "cost_price": "10000",
+            "wholesale_cost": "",
+            "margin_percent": "0.40",
+            "sale_price": "10000",
+            "stock": "1",
+            "status": Product.Status.ACTIVE,
+            "notes": "",
+            "price_sync_source": "margin_percent",
+        }
+        data.update(overrides)
+        return data
+
+    def test_margin_percent_updates_sale_price_rounded_up_to_hundred(self):
+        form = ProductAdminForm(
+            data=self.form_data(
+                cost_price="10000",
+                margin_percent="0.40",
+                sale_price="10000",
+                price_sync_source="margin_percent",
             )
+        )
 
-        context = admin_dashboard_callback(None, {})
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["sale_price"], 10100)
 
-        self.assertEqual(len(context["dashboard_products"]), 25)
-        self.assertEqual(context["dashboard_metrics"][0]["value"], 30)
+    def test_sale_price_updates_margin_percent(self):
+        form = ProductAdminForm(
+            data=self.form_data(
+                cost_price="55000",
+                margin_percent="0",
+                sale_price="90000",
+                price_sync_source="sale_price",
+            )
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["margin_percent"], Decimal("63.64"))

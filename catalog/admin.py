@@ -1,4 +1,5 @@
 import re
+from decimal import Decimal, ROUND_CEILING, ROUND_HALF_UP
 
 from django.contrib import admin
 from django.contrib import messages
@@ -6,6 +7,7 @@ from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import Group, User
 from django import forms
+from django.utils.html import format_html
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 
@@ -18,10 +20,29 @@ def format_guarani(value):
     return f"₲ {int(value):,}".replace(",", ".")
 
 
+def round_up_to_hundred(value):
+    value = Decimal(value)
+    return int((value / Decimal("100")).to_integral_value(rounding=ROUND_CEILING) * 100)
+
+
+def calculate_sale_price(cost_price, margin_percent):
+    multiplier = Decimal("1") + (Decimal(margin_percent) / Decimal("100"))
+    return round_up_to_hundred(Decimal(cost_price) * multiplier)
+
+
+def calculate_margin_percent(cost_price, sale_price):
+    if not cost_price:
+        return None
+
+    margin = ((Decimal(sale_price) - Decimal(cost_price)) / Decimal(cost_price)) * Decimal("100")
+    return margin.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
 class ProductAdminForm(forms.ModelForm):
     cost_price = forms.CharField(label="Costo", required=True)
     wholesale_cost = forms.CharField(label="Costo mayorista", required=False)
     sale_price = forms.CharField(label="Precio de venta", required=True)
+    price_sync_source = forms.CharField(required=False, widget=forms.HiddenInput)
 
     class Meta:
         model = Product
@@ -51,6 +72,34 @@ class ProductAdminForm(forms.ModelForm):
 
     def clean_sale_price(self):
         return self._clean_numeric_string(self.cleaned_data.get("sale_price"))
+
+    def clean(self):
+        cleaned_data = super().clean()
+        cost_price = cleaned_data.get("cost_price")
+        margin_percent = cleaned_data.get("margin_percent")
+        sale_price = cleaned_data.get("sale_price")
+        sync_source = cleaned_data.get("price_sync_source")
+
+        if not cost_price:
+            return cleaned_data
+
+        if sync_source == "sale_price" and sale_price is not None:
+            cleaned_data["margin_percent"] = calculate_margin_percent(
+                cost_price,
+                sale_price,
+            )
+        elif margin_percent is not None:
+            cleaned_data["sale_price"] = calculate_sale_price(
+                cost_price,
+                margin_percent,
+            )
+        elif sale_price is not None:
+            cleaned_data["margin_percent"] = calculate_margin_percent(
+                cost_price,
+                sale_price,
+            )
+
+        return cleaned_data
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -128,10 +177,11 @@ class ProductAdmin(ModelAdmin):
         "category",
         "supplier",
         "formatted_sale_price",
-        "stock",
-        "status",
+        "stock_badge",
+        "status_badge",
     ]
     list_filter = [StockLevelFilter, "category", "supplier", "status"]
+    list_per_page = 25
     ordering = ["code", "name"]
     search_fields = ["code", "name"]
     actions = ["mark_as_active", "mark_as_sold_out", "mark_as_hidden"]
@@ -160,6 +210,7 @@ class ProductAdmin(ModelAdmin):
                     "wholesale_cost",
                     "margin_percent",
                     "sale_price",
+                    "price_sync_source",
                     "stock",
                 ],
             },
@@ -187,6 +238,39 @@ class ProductAdmin(ModelAdmin):
     def formatted_sale_price(self, obj):
         value = f"{obj.sale_price:,}".replace(",", ".")
         return f"₲ {value}"
+
+    @admin.display(description="Stock", ordering="stock")
+    def stock_badge(self, obj):
+        if obj.stock == 0:
+            classes = "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300"
+            label = "Sin stock"
+        elif obj.stock < 5:
+            classes = "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-300"
+            label = f"{obj.stock} disp."
+        else:
+            classes = "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300"
+            label = f"{obj.stock} disp."
+
+        return format_html(
+            '<span class="rounded-default px-2 py-1 text-xs font-medium {}">{}</span>',
+            classes,
+            label,
+        )
+
+    @admin.display(description="Estado", ordering="status")
+    def status_badge(self, obj):
+        styles = {
+            Product.Status.ACTIVE: "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300",
+            Product.Status.SOLD_OUT: "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300",
+            Product.Status.HIDDEN: "bg-base-100 text-base-700 dark:bg-base-800 dark:text-base-300",
+            Product.Status.DRAFT: "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-300",
+        }
+
+        return format_html(
+            '<span class="rounded-default px-2 py-1 text-xs font-medium {}">{}</span>',
+            styles.get(obj.status, styles[Product.Status.DRAFT]),
+            obj.get_status_display(),
+        )
 
     @admin.action(description="Marcar seleccionados como Activo")
     def mark_as_active(self, request, queryset):

@@ -1,5 +1,10 @@
 (function () {
     const priceFieldIds = ["id_cost_price", "id_wholesale_cost", "id_sale_price"];
+    const costFieldId = "id_cost_price";
+    const marginFieldId = "id_margin_percent";
+    const salePriceFieldId = "id_sale_price";
+    const priceSyncSourceFieldId = "id_price_sync_source";
+    let syncingCalculatedFields = false;
 
     function onlyDigits(value) {
         return (value || "").replace(/\D+/g, "");
@@ -17,6 +22,88 @@
         }
 
         return `₲ ${number.toLocaleString("es-PY")}`;
+    }
+
+    function parseIntegerField(field) {
+        if (!field) {
+            return null;
+        }
+
+        const digits = onlyDigits(field.value);
+        if (!digits) {
+            return null;
+        }
+
+        const value = Number.parseInt(digits, 10);
+        return Number.isNaN(value) ? null : value;
+    }
+
+    function parseDecimalField(field) {
+        if (!field || !field.value) {
+            return null;
+        }
+
+        const normalized = field.value.replace(",", ".").trim();
+        const value = Number.parseFloat(normalized);
+        return Number.isNaN(value) ? null : value;
+    }
+
+    function roundUpToHundred(value) {
+        return Math.ceil(value / 100) * 100;
+    }
+
+    function calculateSalePrice(cost, marginPercent) {
+        return roundUpToHundred(cost * (1 + marginPercent / 100));
+    }
+
+    function calculateMarginPercent(cost, salePrice) {
+        if (!cost) {
+            return null;
+        }
+
+        return ((salePrice - cost) / cost) * 100;
+    }
+
+    function updateSalePriceFromMargin(costField, marginField, salePriceField) {
+        if (syncingCalculatedFields) {
+            return;
+        }
+
+        const cost = parseIntegerField(costField);
+        const marginPercent = parseDecimalField(marginField);
+        if (cost === null || marginPercent === null) {
+            return;
+        }
+
+        syncingCalculatedFields = true;
+        setPriceSyncSource("margin_percent");
+        salePriceField.value = formatGuarani(String(calculateSalePrice(cost, marginPercent)));
+        syncingCalculatedFields = false;
+    }
+
+    function updateMarginFromSalePrice(costField, marginField, salePriceField) {
+        if (syncingCalculatedFields) {
+            return;
+        }
+
+        const cost = parseIntegerField(costField);
+        const salePrice = parseIntegerField(salePriceField);
+        const marginPercent = calculateMarginPercent(cost, salePrice);
+        if (marginPercent === null) {
+            return;
+        }
+
+        syncingCalculatedFields = true;
+        setPriceSyncSource("sale_price");
+        marginField.value = marginPercent.toFixed(2);
+        syncingCalculatedFields = false;
+    }
+
+    function setPriceSyncSource(source) {
+        const sourceField = document.getElementById(priceSyncSourceFieldId);
+        if (sourceField) {
+            sourceField.value = source;
+        }
     }
 
     function setupField(field) {
@@ -54,6 +141,36 @@
         });
     }
 
+    function setupPriceCalculator() {
+        const costField = document.getElementById(costFieldId);
+        const marginField = document.getElementById(marginFieldId);
+        const salePriceField = document.getElementById(salePriceFieldId);
+
+        if (!costField || !marginField || !salePriceField) {
+            return;
+        }
+
+        costField.addEventListener("blur", function () {
+            updateSalePriceFromMargin(costField, marginField, salePriceField);
+        });
+
+        marginField.addEventListener("input", function () {
+            updateSalePriceFromMargin(costField, marginField, salePriceField);
+        });
+
+        marginField.addEventListener("blur", function () {
+            updateSalePriceFromMargin(costField, marginField, salePriceField);
+        });
+
+        salePriceField.addEventListener("input", function () {
+            updateMarginFromSalePrice(costField, marginField, salePriceField);
+        });
+
+        salePriceField.addEventListener("blur", function () {
+            updateMarginFromSalePrice(costField, marginField, salePriceField);
+        });
+    }
+
     function init() {
         const fields = priceFieldIds
             .map(function (fieldId) {
@@ -62,6 +179,7 @@
             .filter(Boolean);
 
         fields.forEach(setupField);
+        setupPriceCalculator();
         setupFormSubmitSanitizer(fields);
     }
 

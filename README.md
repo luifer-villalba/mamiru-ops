@@ -140,12 +140,12 @@ Los servicios quedan disponibles en:
 
 ## 8. Entrar al Django Admin
 
-Abrí http://localhost:8000/ e ingresá con el superusuario creado.
+Abrí http://localhost:8000/ e ingresá con el superusuario creado. La pantalla inicial abre directamente el listado de productos del admin, con búsqueda, filtros y paginación.
 
 Desde el admin podés:
 - Crear/editar proveedores, categorías y productos.
 - Subir fotos a productos.
-- Filtrar por categoría, proveedor o estado.
+- Filtrar productos por stock, categoría, proveedor o estado.
 
 ---
 
@@ -194,7 +194,7 @@ git pull
 2. Creá una rama corta por cambio:
 
 ```bash
-git switch -c feature/dashboard-productos
+git switch -c feature/admin-productos
 ```
 
 3. Revisá y probá antes de commitear:
@@ -210,13 +210,13 @@ python manage.py test
 
 ```bash
 git add .
-git commit -m "Show products on admin dashboard"
+git commit -m "Open admin on product list"
 ```
 
 5. Subí la rama y abrí un PR/review:
 
 ```bash
-git push -u origin feature/dashboard-productos
+git push -u origin feature/admin-productos
 ```
 
 En el review conviene mirar: cambios de modelos/migraciones, templates del admin, variables de entorno, y resultado de `check` + `test`.
