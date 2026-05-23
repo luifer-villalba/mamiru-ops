@@ -2,7 +2,8 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.http import JsonResponse
-from django.urls import include, path
+from django.urls import include, path, reverse_lazy
+from django.views.generic import RedirectView
 
 
 def healthz(_request):
@@ -10,8 +11,9 @@ def healthz(_request):
 
 urlpatterns = [
     path("healthz/", healthz),
-    path("admin/", admin.site.urls),
+    path("admin/", RedirectView.as_view(url=reverse_lazy("admin:index"), permanent=True)),
     path("api/", include("catalog.urls")),
+    path("", admin.site.urls),
 ]
 
 if settings.DEBUG:
