@@ -7,7 +7,6 @@ from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import Group, User
 from django import forms
-from django.forms.models import BaseModelFormSet
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 
@@ -109,12 +108,6 @@ class ProductAdminForm(forms.ModelForm):
             self.initial["sale_price"] = format_guarani(self.instance.sale_price)
 
 
-class ProductChangeListForm(forms.ModelForm):
-    class Meta:
-        model = Product
-        fields = "__all__"
-
-
 admin.site.site_header = "Mamiru Ops"
 admin.site.site_title = "Mamiru Ops"
 admin.site.index_title = "Panel de administración"
@@ -174,45 +167,12 @@ class StockLevelFilter(admin.SimpleListFilter):
         return queryset
 
 
-class ProductChangeListFormSet(BaseModelFormSet):
-    def save_existing(self, form, obj, commit=True):
-        product = form.save(commit=False)
-        changed_fields = set(form.changed_data)
-
-        if "sale_price" in changed_fields and product.cost_price:
-            product.margin_percent = calculate_margin_percent(
-                product.cost_price,
-                product.sale_price,
-            )
-        elif changed_fields.intersection({"cost_price", "margin_percent"}):
-            if product.margin_percent is not None:
-                product.sale_price = calculate_sale_price(
-                    product.cost_price,
-                    product.margin_percent,
-                )
-
-        if commit:
-            product.save()
-            form.save_m2m()
-
-        return product
-
-
 @admin.register(Product)
 class ProductAdmin(ModelAdmin):
     form = ProductAdminForm
     list_display = [
         "code",
         "name",
-        "stock",
-        "sale_price",
-        "cost_price",
-        "margin_percent",
-        "supplier",
-        "category",
-        "status",
-    ]
-    list_editable = [
         "stock",
         "sale_price",
         "cost_price",
@@ -274,13 +234,6 @@ class ProductAdmin(ModelAdmin):
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
         return queryset.select_related("category", "supplier")
-
-    def get_changelist_formset(self, request, **kwargs):
-        kwargs["formset"] = ProductChangeListFormSet
-        return super().get_changelist_formset(request, **kwargs)
-
-    def get_changelist_form(self, request, **kwargs):
-        return ProductChangeListForm
 
     @admin.action(description="Marcar seleccionados como Activo")
     def mark_as_active(self, request, queryset):

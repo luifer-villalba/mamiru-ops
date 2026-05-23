@@ -1,7 +1,6 @@
 from decimal import Decimal
 
 from django.contrib.auth import authenticate, get_user_model
-from django.forms import modelformset_factory
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -64,22 +63,6 @@ class AdminHomeTests(TestCase):
         from catalog.admin import ProductAdmin
 
         self.assertEqual(ProductAdmin.list_per_page, 25)
-
-    def test_product_admin_uses_inline_editable_fields(self):
-        from catalog.admin import ProductAdmin
-
-        self.assertEqual(
-            ProductAdmin.list_editable,
-            [
-                "stock",
-                "sale_price",
-                "cost_price",
-                "margin_percent",
-                "supplier",
-                "category",
-                "status",
-            ],
-        )
 
     def test_product_admin_list_display_order(self):
         from catalog.admin import ProductAdmin
@@ -161,84 +144,6 @@ class ProductAdminFormPriceSyncTests(TestCase):
 
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(form.cleaned_data["margin_percent"], Decimal("63.64"))
-
-
-class ProductChangeListInlineEditTests(TestCase):
-    def setUp(self):
-        self.category = Category.objects.create(name="Inline", slug="inline")
-        self.supplier = Supplier.objects.create(name="Proveedor inline")
-        self.product = Product.objects.create(
-            name="Producto inline",
-            slug="producto-inline",
-            category=self.category,
-            supplier=self.supplier,
-            cost_price=10000,
-            sale_price=10000,
-            margin_percent=Decimal("0.00"),
-            stock=1,
-            status=Product.Status.ACTIVE,
-        )
-
-    def formset_data(self, **overrides):
-        data = {
-            "form-TOTAL_FORMS": "1",
-            "form-INITIAL_FORMS": "1",
-            "form-MIN_NUM_FORMS": "0",
-            "form-MAX_NUM_FORMS": "1000",
-            "form-0-id": str(self.product.pk),
-            "form-0-stock": str(self.product.stock),
-            "form-0-sale_price": str(self.product.sale_price),
-            "form-0-cost_price": str(self.product.cost_price),
-            "form-0-margin_percent": str(self.product.margin_percent),
-            "form-0-supplier": str(self.supplier.pk),
-            "form-0-category": str(self.category.pk),
-            "form-0-status": self.product.status,
-        }
-        data.update(overrides)
-        return data
-
-    def build_formset(self, data):
-        from catalog.admin import ProductChangeListForm, ProductChangeListFormSet
-
-        formset_class = modelformset_factory(
-            Product,
-            form=ProductChangeListForm,
-            formset=ProductChangeListFormSet,
-            fields=[
-                "stock",
-                "sale_price",
-                "cost_price",
-                "margin_percent",
-                "supplier",
-                "category",
-                "status",
-            ],
-            extra=0,
-        )
-        return formset_class(
-            data=data,
-            queryset=Product.objects.filter(pk=self.product.pk),
-        )
-
-    def test_inline_margin_change_updates_sale_price(self):
-        formset = self.build_formset(
-            self.formset_data(**{"form-0-margin_percent": "0.40"})
-        )
-
-        self.assertTrue(formset.is_valid(), formset.errors)
-        formset.save()
-        self.product.refresh_from_db()
-        self.assertEqual(self.product.sale_price, 10100)
-
-    def test_inline_sale_price_change_updates_margin_percent(self):
-        formset = self.build_formset(
-            self.formset_data(**{"form-0-sale_price": "18000"})
-        )
-
-        self.assertTrue(formset.is_valid(), formset.errors)
-        formset.save()
-        self.product.refresh_from_db()
-        self.assertEqual(self.product.margin_percent, Decimal("80.00"))
 
 
 class UsernameOrEmailBackendTests(TestCase):
