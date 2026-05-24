@@ -51,7 +51,6 @@ staticfiles/
 # Ruler generated files
 /.ruler/
 /CLAUDE.md
-/AGENTS.md
 /.github/copilot-instructions.md.bak
 
 

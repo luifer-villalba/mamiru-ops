@@ -2,8 +2,8 @@ import os
 from pathlib import Path
 
 import dj_database_url
-from dotenv import load_dotenv
 from django.urls import reverse_lazy
+from dotenv import load_dotenv
 
 # Load .env file if present (development only)
 load_dotenv()
