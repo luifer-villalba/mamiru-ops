@@ -9,7 +9,7 @@ DB_VOLUME ?= mamiru-ops_postgres_data
 
 .DEFAULT_GOAL := help
 
-.PHONY: help env build up down restart logs ps check shell bash migrate makemigrations superuser test collectstatic import seed reset-db local-run local-migrate local-makemigrations local-superuser local-test local-shell
+.PHONY: help env build up down restart logs ps check shell bash migrate makemigrations superuser test collectstatic import seed reset-db local-run local-migrate local-makemigrations local-superuser local-test local-shell lint format lint-fix pytest pytest-cov
 
 help: ## Mostrar comandos disponibles
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUso: make <comando>\n\nComandos:\n"} /^[a-zA-Z0-9_-]+:.*##/ {printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -110,3 +110,23 @@ local-test: env ## Ejecutar tests localmente
 local-shell: env ## Abrir shell de Django localmente
 	@echo "Abriendo shell de Django localmente..."
 	$(MANAGE) shell
+
+lint: ## Ejecutar ruff check localmente
+	@echo "Ejecutando ruff check..."
+	ruff check .
+
+format: ## Ejecutar ruff format localmente
+	@echo "Ejecutando ruff format..."
+	ruff format .
+
+lint-fix: ## Ejecutar ruff check con autofix localmente
+	@echo "Ejecutando ruff check --fix..."
+	ruff check . --fix
+
+pytest: ## Ejecutar tests con pytest localmente
+	@echo "Ejecutando pytest..."
+	pytest
+
+pytest-cov: ## Ejecutar pytest con coverage localmente
+	@echo "Ejecutando pytest con coverage..."
+	pytest --cov=catalog --cov-report=term-missing
