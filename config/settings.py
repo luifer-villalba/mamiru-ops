@@ -19,9 +19,7 @@ SECRET_KEY = os.environ.get("SECRET_KEY", _INSECURE_KEY)
 DEBUG = os.environ.get("DEBUG", "False") == "True"
 
 if not DEBUG and (not SECRET_KEY or SECRET_KEY == _INSECURE_KEY):
-    raise RuntimeError(
-        "SECRET_KEY must be set to a secure value when DEBUG is False."
-    )
+    raise RuntimeError("SECRET_KEY must be set to a secure value when DEBUG is False.")
 
 ALLOWED_HOSTS = [
     host.strip()
@@ -101,7 +99,9 @@ DATABASES = {
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"
+    },
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
@@ -178,6 +178,16 @@ UNFOLD = {
                         "title": "Productos",
                         "icon": "inventory_2",
                         "link": reverse_lazy("admin:catalog_product_changelist"),
+                    },
+                    {
+                        "title": "Nueva compra",
+                        "icon": "add_shopping_cart",
+                        "link": reverse_lazy("admin:catalog_purchase_new"),
+                    },
+                    {
+                        "title": "Compras",
+                        "icon": "receipt_long",
+                        "link": reverse_lazy("admin:catalog_purchaseorder_changelist"),
                     },
                     {
                         "title": "Categorías",

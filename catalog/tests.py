@@ -1,14 +1,15 @@
 from decimal import Decimal
+from unittest import mock
 
 from django.contrib.auth import authenticate, get_user_model
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from catalog.admin import ProductAdminForm
+from catalog.admin import ProductAdminForm, build_purchase_lines
 from config.forms import UsernameOrEmailAuthenticationForm
 
-from .models import Category, Product, Supplier
+from .models import Category, Product, PurchaseOrder, PurchaseOrderLine, Supplier
 
 
 class ProductCodeTests(TestCase):
@@ -144,6 +145,172 @@ class ProductAdminFormPriceSyncTests(TestCase):
 
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(form.cleaned_data["margin_percent"], Decimal("63.64"))
+
+
+class PurchaseOrderAdminTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_superuser(
+            username="admin",
+            email="admin@example.com",
+            password="secret",
+        )
+        self.client.force_login(self.user)
+        self.category = Category.objects.create(
+            name="Compra test",
+            slug="compra-test",
+        )
+        self.supplier = Supplier.objects.create(name="Proveedor compras")
+        self.product = Product.objects.create(
+            code="269999",
+            name="Aro existente",
+            slug="aro-existente",
+            category=self.category,
+            supplier=self.supplier,
+            cost_price=10000,
+            margin_percent=Decimal("40.00"),
+            sale_price=14000,
+            stock=5,
+            status=Product.Status.ACTIVE,
+        )
+
+    def purchase_payload(self, **overrides):
+        data = {
+            "supplier": self.supplier.pk,
+            "date": timezone.localdate().isoformat(),
+            "invoice_number": "001-001-0000007",
+            "notes": "Reposición semanal",
+            "total_rows": "2",
+            "lines-0-code": self.product.code,
+            "lines-0-name": "",
+            "lines-0-quantity": "3",
+            "lines-0-unit_cost": "10.000",
+            "lines-0-category": self.category.pk,
+            "lines-0-material": "",
+            "lines-0-margin_percent": "",
+            "lines-1-code": "",
+            "lines-1-name": "Aro nuevo",
+            "lines-1-quantity": "2",
+            "lines-1-unit_cost": "55.000Gs.",
+            "lines-1-category": self.category.pk,
+            "lines-1-material": "Acero",
+            "lines-1-margin_percent": "40",
+        }
+        data.update(overrides)
+        return data
+
+    def test_product_lookup_returns_existing_product_data(self):
+        response = self.client.get(
+            reverse("admin:catalog_product_lookup"),
+            {"code": self.product.code},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {
+                "found": True,
+                "name": "Aro existente",
+                "category_id": self.category.pk,
+                "category_name": "Compra test",
+                "supplier_name": "Proveedor compras",
+                "cost_price": 10000,
+                "sale_price": 14000,
+                "stock": 5,
+                "margin_percent": "40.00",
+            },
+        )
+
+    def test_product_search_returns_products_by_name(self):
+        response = self.client.get(
+            reverse("admin:catalog_product_search"),
+            {"q": "existente"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["results"][0],
+            {
+                "code": "269999",
+                "name": "Aro existente",
+                "category_id": self.category.pk,
+                "category_name": "Compra test",
+                "supplier_name": "Proveedor compras",
+                "cost_price": 10000,
+                "sale_price": 14000,
+                "stock": 5,
+                "margin_percent": "40.00",
+            },
+        )
+
+    def test_new_purchase_updates_existing_stock_and_creates_new_product(self):
+        response = self.client.post(
+            reverse("admin:catalog_purchase_new"),
+            data=self.purchase_payload(),
+        )
+
+        order = PurchaseOrder.objects.get()
+        self.assertRedirects(
+            response,
+            reverse("admin:catalog_purchaseorder_change", args=[order.pk]),
+            fetch_redirect_response=False,
+        )
+
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 8)
+
+        new_product = Product.objects.get(name="Aro nuevo")
+        self.assertNotEqual(new_product.code, "NO-EXISTE")
+        self.assertEqual(new_product.stock, 2)
+        self.assertEqual(new_product.cost_price, 55000)
+        self.assertEqual(new_product.margin_percent, Decimal("40.00"))
+        self.assertEqual(new_product.sale_price, 77000)
+        self.assertEqual(new_product.status, Product.Status.ACTIVE)
+
+        self.assertEqual(order.supplier, self.supplier)
+        self.assertEqual(order.invoice_number, "001-001-0000007")
+        self.assertEqual(order.created_by, self.user)
+        self.assertEqual(order.lines.count(), 2)
+        self.assertEqual(
+            PurchaseOrderLine.objects.get(product=self.product).quantity,
+            3,
+        )
+        self.assertIsNone(
+            PurchaseOrderLine.objects.get(product_name="Aro nuevo").product
+        )
+
+    def test_new_purchase_rejects_unknown_code(self):
+        lines, errors = build_purchase_lines(
+            self.purchase_payload(
+                total_rows="1",
+                **{"lines-0-code": "NO-EXISTE", "lines-0-name": "Aro manual"},
+            )
+        )
+
+        self.assertEqual(lines, [])
+        self.assertEqual(
+            errors,
+            [
+                "Fila 1: el código NO-EXISTE no existe. "
+                "Dejá el código vacío para crear un producto nuevo.",
+                "Agregá al menos una línea de compra.",
+            ],
+        )
+
+    def test_new_purchase_rolls_back_if_line_history_fails(self):
+        with mock.patch(
+            "catalog.admin.PurchaseOrderLine.objects.create",
+            side_effect=RuntimeError("boom"),
+        ):
+            with self.assertRaises(RuntimeError):
+                self.client.post(
+                    reverse("admin:catalog_purchase_new"),
+                    data=self.purchase_payload(total_rows="1"),
+                )
+
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 5)
+        self.assertEqual(PurchaseOrder.objects.count(), 0)
+        self.assertEqual(PurchaseOrderLine.objects.count(), 0)
 
 
 class UsernameOrEmailBackendTests(TestCase):

@@ -6,46 +6,79 @@ MANAGE ?= $(PYTHON) manage.py
 SERVICE ?= web
 SEED_FILE ?= data/stock.csv
 DB_VOLUME ?= mamiru-ops_postgres_data
+APP_URL ?= http://localhost:8000
+ADMIN_URL ?= $(APP_URL)/
+PRODUCTS_ADMIN_URL ?= $(APP_URL)/admin/catalog/product/
+PURCHASE_HISTORY_URL ?= $(APP_URL)/admin/catalog/purchaseorder/
+API_URL ?= $(APP_URL)/api/
+API_PRODUCTS_URL ?= $(APP_URL)/api/products/
 
 .DEFAULT_GOAL := help
 
-.PHONY: help env build up down restart logs ps check shell bash migrate makemigrations superuser test collectstatic import seed reset-db local-run local-migrate local-makemigrations local-superuser local-test local-shell lint format lint-fix pytest pytest-cov
+.PHONY: help links env build up down restart logs ps check shell bash migrate makemigrations superuser test collectstatic import seed reset-db local-run local-migrate local-makemigrations local-superuser local-test local-shell lint format lint-fix pytest pytest-cov
 
 help: ## Mostrar comandos disponibles
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUso: make <comando>\n\nComandos:\n"} /^[a-zA-Z0-9_-]+:.*##/ {printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@echo ""
+	@echo "Links utiles:"
+	@echo "  App/Admin:           $(ADMIN_URL)"
+	@echo "  Historial compras:   $(PURCHASE_HISTORY_URL)"
+	@echo "  Productos admin:     $(PRODUCTS_ADMIN_URL)"
+	@echo "  API:                 $(API_URL)"
+	@echo ""
+	@echo "Tip: podes cambiar el host con APP_URL=http://127.0.0.1:8000 make links"
+
+links: ## Mostrar links utiles del entorno local
+	@echo "Mamiru Ops - links locales"
+	@echo "  App/Admin:           $(ADMIN_URL)"
+	@echo "  Historial compras:   $(PURCHASE_HISTORY_URL)"
+	@echo "  Productos admin:     $(PRODUCTS_ADMIN_URL)"
+	@echo "  API:                 $(API_URL)"
+	@echo "  API productos:       $(API_PRODUCTS_URL)"
 
 env: ## Crear .env desde .env.example si no existe
 	@echo "Revisando archivo .env..."
 	@test -f .env || cp .env.example .env
+	@echo ".env listo. Si necesitas tocar credenciales locales, edita .env"
 
 build: ## Construir imagenes Docker
 	@echo "Construyendo imagenes Docker..."
 	$(COMPOSE) build
+	@echo "Imagenes listas. Siguiente paso habitual: make up"
 
 up: env ## Levantar servicios Docker en segundo plano
 	@echo "Levantando servicios Docker..."
 	$(COMPOSE) up --build -d
+	@echo "Servicios arriba."
+	@echo "  Admin:         $(ADMIN_URL)"
+	@echo "  API:           $(API_URL)"
+	@echo "Para ver logs: make logs"
 
 down: ## Detener servicios Docker y remover contenedores huerfanos
 	@echo "Deteniendo servicios Docker..."
 	$(COMPOSE) down --remove-orphans
+	@echo "Servicios detenidos."
 
 restart: down up ## Reiniciar servicios Docker
 
 logs: ## Ver logs de Docker en tiempo real
 	@echo "Mostrando logs de Docker..."
+	@echo "Admin local: $(ADMIN_URL)"
 	$(COMPOSE) logs -f
 
 ps: ## Mostrar estado de servicios Docker
 	@echo "Mostrando estado de servicios Docker..."
 	$(COMPOSE) ps
+	@echo "Links rapidos: make links"
 
 check: ## Ejecutar chequeos de Django en un contenedor temporal
 	@echo "Ejecutando chequeos de Django..."
 	$(COMPOSE) run --rm --no-deps --entrypoint python $(SERVICE) manage.py check
+	@echo "Django check OK."
 
 shell: ## Abrir shell de Django en Docker
 	@echo "Abriendo shell de Django en Docker..."
+	@echo "Modelo util: from catalog.models import Product, PurchaseOrder"
 	$(COMPOSE) exec $(SERVICE) $(MANAGE) shell
 
 bash: ## Abrir shell dentro del contenedor web
@@ -55,78 +88,101 @@ bash: ## Abrir shell dentro del contenedor web
 migrate: ## Ejecutar migraciones de Django en Docker
 	@echo "Ejecutando migraciones de Django en Docker..."
 	$(COMPOSE) exec $(SERVICE) $(MANAGE) migrate
+	@echo "Migraciones aplicadas. Admin: $(ADMIN_URL)"
 
 makemigrations: ## Crear migraciones de Django en Docker
 	@echo "Creando migraciones de Django en Docker..."
 	$(COMPOSE) exec $(SERVICE) $(MANAGE) makemigrations
+	@echo "Migraciones creadas. Revisalas con: git diff catalog/migrations"
 
 superuser: ## Crear superusuario de Django en Docker
 	@echo "Creando superusuario de Django en Docker..."
 	$(COMPOSE) exec $(SERVICE) $(MANAGE) createsuperuser
+	@echo "Cuando termines, entra al admin: $(ADMIN_URL)"
 
 test: ## Ejecutar tests de Django en Docker
 	@echo "Ejecutando tests de Django en Docker..."
 	$(COMPOSE) exec $(SERVICE) $(MANAGE) test
+	@echo "Tests OK."
 
 collectstatic: ## Recolectar archivos estaticos en Docker
 	@echo "Recolectando archivos estaticos en Docker..."
 	$(COMPOSE) exec $(SERVICE) $(MANAGE) collectstatic --noinput
+	@echo "Static listo para servir con WhiteNoise."
 
 import: ## Importar CSV de stock en Docker. Uso: make import CSV=ruta/archivo.csv
 	@echo "Importando CSV de stock en Docker..."
 	@test -n "$(CSV)" || (echo "Falta CSV. Uso: make import CSV=ruta/archivo.csv" && exit 1)
 	$(COMPOSE) exec $(SERVICE) $(MANAGE) import_mamiru_stock "$(CSV)"
+	@echo "Importacion lista. Revisa productos: $(PRODUCTS_ADMIN_URL)"
 
 seed: ## Importar stock inicial. Uso: make seed SEED_FILE=data/stock.csv
 	@echo "Importando stock inicial desde $(SEED_FILE)..."
 	$(COMPOSE) exec $(SERVICE) $(MANAGE) import_mamiru_stock "$(SEED_FILE)" --skip-existing --seed-codes
+	@echo "Seed aplicado. Productos: $(PRODUCTS_ADMIN_URL)"
 
 reset-db: ## Resetear la base local de Docker sin borrar media
 	@echo "Reseteando base local de Docker..."
+	@echo "Esto borra el volumen Docker: $(DB_VOLUME)"
 	$(COMPOSE) down --remove-orphans
 	docker volume rm $(DB_VOLUME)
 	$(COMPOSE) up --build -d
+	@echo "Base reiniciada y servicios arriba."
+	@echo "Siguiente paso habitual: make migrate && make seed && make superuser"
+	@echo "Admin: $(ADMIN_URL)"
 
 local-run: env ## Levantar servidor de desarrollo local
 	@echo "Levantando servidor de desarrollo local..."
+	@echo "  Admin:         $(ADMIN_URL)"
+	@echo "  API:           $(API_URL)"
 	$(MANAGE) runserver
 
 local-migrate: env ## Ejecutar migraciones localmente
 	@echo "Ejecutando migraciones localmente..."
 	$(MANAGE) migrate
+	@echo "Migraciones locales aplicadas. Admin: $(ADMIN_URL)"
 
 local-makemigrations: env ## Crear migraciones localmente
 	@echo "Creando migraciones localmente..."
 	$(MANAGE) makemigrations
+	@echo "Migraciones locales creadas. Revisalas con: git diff catalog/migrations"
 
 local-superuser: env ## Crear superusuario localmente
 	@echo "Creando superusuario localmente..."
 	$(MANAGE) createsuperuser
+	@echo "Cuando termines, entra al admin: $(ADMIN_URL)"
 
 local-test: env ## Ejecutar tests localmente
 	@echo "Ejecutando tests localmente..."
 	$(MANAGE) test
+	@echo "Tests locales OK."
 
 local-shell: env ## Abrir shell de Django localmente
 	@echo "Abriendo shell de Django localmente..."
+	@echo "Modelo util: from catalog.models import Product, PurchaseOrder"
 	$(MANAGE) shell
 
 lint: ## Ejecutar ruff check localmente
 	@echo "Ejecutando ruff check..."
 	ruff check .
+	@echo "Ruff check OK."
 
 format: ## Ejecutar ruff format localmente
 	@echo "Ejecutando ruff format..."
 	ruff format .
+	@echo "Formato aplicado."
 
 lint-fix: ## Ejecutar ruff check con autofix localmente
 	@echo "Ejecutando ruff check --fix..."
 	ruff check . --fix
+	@echo "Autofix aplicado. Revisa el diff antes de commitear."
 
 pytest: ## Ejecutar tests con pytest localmente
 	@echo "Ejecutando pytest..."
 	pytest
+	@echo "Pytest OK."
 
 pytest-cov: ## Ejecutar pytest con coverage localmente
 	@echo "Ejecutando pytest con coverage..."
 	pytest --cov=catalog --cov-report=term-missing
+	@echo "Coverage listo."

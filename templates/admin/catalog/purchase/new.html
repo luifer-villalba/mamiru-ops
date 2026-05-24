@@ -1,0 +1,924 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<style>
+  .purchase-page {
+    display: grid;
+    gap: 18px;
+  }
+
+  .purchase-panel {
+    background: #ffffff;
+    border: 1px solid #d8dee8;
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    padding: 0;
+  }
+
+  .purchase-section-header {
+    align-items: center;
+    background: #f8fafc;
+    border-bottom: 1px solid #e5e7eb;
+    border-radius: 8px 8px 0 0;
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 14px;
+  }
+
+  .purchase-section-title {
+    color: #111827;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    margin: 0;
+    text-transform: uppercase;
+  }
+
+  .purchase-section-body {
+    padding: 14px;
+  }
+
+  .purchase-grid {
+    display: grid;
+    align-items: end;
+    gap: 14px;
+    grid-template-columns: minmax(240px, 1.2fr) minmax(170px, 0.7fr) minmax(150px, 0.5fr) minmax(260px, 1.3fr);
+  }
+
+  .purchase-field {
+    display: grid;
+    gap: 6px;
+  }
+
+  .purchase-field label {
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .purchase-required {
+    color: #dc2626;
+    font-weight: 700;
+  }
+
+  .purchase-field-heading,
+  .purchase-column-heading {
+    align-items: center;
+    display: flex;
+    gap: 8px;
+    justify-content: space-between;
+  }
+
+  .purchase-field-control {
+    align-items: stretch;
+    display: grid;
+    gap: 8px;
+    grid-template-columns: minmax(0, 1fr) 34px;
+  }
+
+  .purchase-admin-link {
+    align-items: center;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    display: inline-flex;
+    font-size: 12px;
+    font-weight: 600;
+    height: 34px;
+    justify-content: center;
+    line-height: 1;
+    text-decoration: none;
+    width: 34px;
+    white-space: nowrap;
+  }
+
+  .purchase-admin-link svg {
+    height: 16px;
+    width: 16px;
+  }
+
+  .purchase-field input,
+  .purchase-field select,
+  .purchase-field textarea,
+  .purchase-lines input,
+  .purchase-lines select {
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    box-sizing: border-box;
+    min-height: 38px;
+    padding: 8px 10px;
+    width: 100%;
+  }
+
+  .purchase-line-control {
+    align-items: start;
+    display: grid;
+    gap: 8px;
+    grid-template-columns: minmax(0, 1fr) 34px;
+  }
+
+  .purchase-search-button {
+    align-items: center;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    box-sizing: border-box;
+    cursor: pointer;
+    display: inline-flex;
+    height: 38px;
+    justify-content: center;
+    padding: 0;
+    width: 34px;
+  }
+
+  .purchase-search-button svg {
+    height: 16px;
+    width: 16px;
+  }
+
+  .purchase-row-error {
+    color: #dc2626;
+    font-size: 12px;
+    line-height: 1.25;
+    margin-top: 4px;
+  }
+
+  .purchase-lines {
+    padding: 0;
+    overflow-x: auto;
+  }
+
+  .purchase-lines table {
+    border-collapse: collapse;
+    min-width: 1080px;
+    table-layout: fixed;
+    width: 100%;
+  }
+
+  .purchase-lines th,
+  .purchase-lines td {
+    border-right: 1px solid #edf0f5;
+    padding: 8px;
+    text-align: left;
+    vertical-align: middle;
+  }
+
+  .purchase-lines th:last-child,
+  .purchase-lines td:last-child {
+    border-right: 0;
+  }
+
+  .purchase-lines th {
+    background: #f8fafc;
+    border-bottom: 1px solid #d8dee8;
+    color: #374151;
+    font-size: 12px;
+    font-weight: 700;
+    height: 42px;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+
+  .purchase-lines td {
+    border-bottom: 1px solid #e5e7eb;
+    height: 54px;
+  }
+
+  .purchase-lines tbody tr:nth-child(even) {
+    background: rgba(148, 163, 184, 0.04);
+  }
+
+  .purchase-lines tbody tr:hover {
+    background: rgba(59, 130, 246, 0.06);
+  }
+
+  .purchase-code {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .purchase-name {
+    min-width: 0;
+  }
+
+  .purchase-number {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+
+  .purchase-category {
+    min-width: 0;
+  }
+
+  .purchase-margin {
+    background: rgba(148, 163, 184, 0.08);
+    color: var(--body-quiet-color);
+  }
+
+  .purchase-actions {
+    align-items: center;
+    background: #f8fafc;
+    border: 1px solid #d8dee8;
+    border-radius: 8px;
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    padding: 12px 14px;
+  }
+
+  .purchase-summary {
+    align-items: stretch;
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(4, minmax(140px, 1fr));
+  }
+
+  .purchase-summary-item {
+    background: #ffffff;
+    border: 1px solid #d8dee8;
+    border-radius: 6px;
+    display: grid;
+    gap: 4px;
+    padding: 10px 12px;
+  }
+
+  .purchase-summary-label {
+    color: var(--body-quiet-color);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .purchase-summary-value {
+    font-size: 18px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+  }
+
+  .purchase-button {
+    align-items: center;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    box-sizing: border-box;
+    display: inline-flex;
+    font-weight: 700;
+    justify-content: center;
+    min-height: 38px;
+    padding: 8px 14px;
+    text-decoration: none;
+  }
+
+  .purchase-button-secondary {
+    background: #ffffff;
+    color: #374151;
+  }
+
+  .purchase-button-primary {
+    background: #6d28d9;
+    border-color: #6d28d9;
+    color: #ffffff;
+  }
+
+  .purchase-button-primary:hover {
+    background: #5b21b6;
+    border-color: #5b21b6;
+    color: #ffffff;
+  }
+
+  .purchase-modal[hidden] {
+    display: none;
+  }
+
+  .purchase-modal {
+    align-items: center;
+    background: rgba(15, 23, 42, 0.38);
+    bottom: 0;
+    display: flex;
+    justify-content: center;
+    left: 0;
+    padding: 20px;
+    position: fixed;
+    right: 0;
+    top: 0;
+    z-index: 1000;
+  }
+
+  .purchase-modal-panel {
+    background: #ffffff;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    box-shadow: 0 24px 70px rgba(15, 23, 42, 0.36);
+    color: #111827;
+    display: grid;
+    gap: 12px;
+    max-width: 720px;
+    padding: 16px;
+    width: min(100%, 720px);
+  }
+
+  .purchase-modal-header {
+    align-items: center;
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+  }
+
+  .purchase-modal-title {
+    font-size: 16px;
+    font-weight: 700;
+    margin: 0;
+  }
+
+  .purchase-modal-close {
+    background: #ffffff;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    color: #374151;
+    cursor: pointer;
+    height: 34px;
+    width: 34px;
+  }
+
+  .purchase-search-input {
+    background: #ffffff;
+    border: 1px solid #9ca3af;
+    border-radius: 6px;
+    box-sizing: border-box;
+    color: #111827;
+    min-height: 40px;
+    padding: 8px 10px;
+    width: 100%;
+  }
+
+  .purchase-search-results {
+    background: #ffffff;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    display: grid;
+    max-height: 340px;
+    overflow: auto;
+  }
+
+  .purchase-search-result {
+    background: #ffffff;
+    border: 0;
+    border-bottom: 1px solid #e5e7eb;
+    color: #111827;
+    cursor: pointer;
+    display: flex;
+    gap: 4px;
+    justify-content: space-between;
+    padding: 10px 12px;
+    text-align: left;
+  }
+
+  .purchase-search-result:last-child {
+    border-bottom: 0;
+  }
+
+  .purchase-search-result:hover {
+    background: #eff6ff;
+  }
+
+  .purchase-search-main {
+    font-weight: 700;
+  }
+
+  .purchase-search-copy {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .purchase-search-meta {
+    color: #6b7280;
+    font-size: 12px;
+  }
+
+  .purchase-search-stats {
+    align-items: end;
+    color: #374151;
+    display: grid;
+    flex: 0 0 210px;
+    font-size: 12px;
+    gap: 4px;
+    justify-items: end;
+  }
+
+  .purchase-shortcuts {
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    color: var(--body-quiet-color);
+    display: flex;
+    flex-wrap: wrap;
+    font-size: 12px;
+    gap: 8px 14px;
+    justify-content: flex-end;
+    padding: 10px 12px;
+  }
+
+  .purchase-shortcuts kbd {
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    color: var(--body-fg);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 6px;
+  }
+
+  @media (max-width: 900px) {
+    .purchase-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .purchase-summary {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+</style>
+
+<form method="post" class="purchase-page" id="purchase-form">
+  {% csrf_token %}
+  <input type="hidden" name="total_rows" id="total-rows" value="0">
+
+  <section class="purchase-panel">
+    <div class="purchase-section-header">
+      <h2 class="purchase-section-title">Datos de la compra</h2>
+    </div>
+    <div class="purchase-section-body">
+      <div class="purchase-grid">
+        <div class="purchase-field">
+          <label for="supplier">Proveedor <span class="purchase-required">*</span></label>
+          <div class="purchase-field-control">
+            <select id="supplier" name="supplier" required>
+              <option value="">---------</option>
+              {% for supplier in suppliers %}
+                <option value="{{ supplier.pk }}">{{ supplier.name }}</option>
+              {% endfor %}
+            </select>
+            <a
+              class="purchase-admin-link"
+              href="{% url 'admin:catalog_supplier_add' %}"
+              target="_blank"
+              rel="noopener"
+              title="Crear proveedor"
+              aria-label="Crear proveedor"
+            >
+              <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                <path d="M10 4v12M4 10h12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </a>
+          </div>
+        </div>
+
+        <div class="purchase-field">
+          <label for="invoice_number">Factura/Comprobante nro.</label>
+          <input id="invoice_number" name="invoice_number" type="text" autocomplete="off">
+        </div>
+
+        <div class="purchase-field">
+          <label for="date">Fecha <span class="purchase-required">*</span></label>
+          <input id="date" name="date" type="date" value="{{ today }}" required>
+        </div>
+
+        <div class="purchase-field">
+          <label for="notes">Notas</label>
+          <textarea id="notes" name="notes" rows="1"></textarea>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="purchase-panel purchase-lines">
+    <div class="purchase-section-header">
+      <h2 class="purchase-section-title">Artículos</h2>
+    </div>
+    <table>
+      <colgroup>
+        <col style="width: 116px;">
+        <col style="width: 280px;">
+        <col style="width: 82px;">
+        <col style="width: 128px;">
+        <col style="width: 128px;">
+        <col style="width: 230px;">
+        <col style="width: 116px;">
+      </colgroup>
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Nombre <span class="purchase-required">*</span></th>
+          <th>Qty <span class="purchase-required">*</span></th>
+          <th>Costo <span class="purchase-required">*</span></th>
+          <th>Precio</th>
+          <th>
+            <span class="purchase-column-heading">
+              Categoría <span class="purchase-required">*</span>
+              <a
+                class="purchase-admin-link"
+                href="{% url 'admin:catalog_category_add' %}"
+                target="_blank"
+                rel="noopener"
+                title="Crear categoría"
+                aria-label="Crear categoría"
+              >
+                <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                  <path d="M10 4v12M4 10h12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+              </a>
+            </span>
+          </th>
+          <th>Margen %</th>
+        </tr>
+      </thead>
+      <tbody id="line-body"></tbody>
+    </table>
+  </section>
+
+  <section class="purchase-panel">
+    <div class="purchase-section-header">
+      <h2 class="purchase-section-title">Resumen</h2>
+    </div>
+    <div class="purchase-section-body">
+      <div class="purchase-summary" aria-live="polite">
+        <div class="purchase-summary-item">
+          <span class="purchase-summary-label">Líneas</span>
+          <strong class="purchase-summary-value" id="summary-lines">0</strong>
+        </div>
+        <div class="purchase-summary-item">
+          <span class="purchase-summary-label">Unidades</span>
+          <strong class="purchase-summary-value" id="summary-units">0</strong>
+        </div>
+        <div class="purchase-summary-item">
+          <span class="purchase-summary-label">Total costo</span>
+          <strong class="purchase-summary-value" id="summary-cost">₲ 0</strong>
+        </div>
+        <div class="purchase-summary-item">
+          <span class="purchase-summary-label">Venta estimada</span>
+          <strong class="purchase-summary-value" id="summary-sale">₲ 0</strong>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="purchase-actions">
+    <a href="{% url 'admin:catalog_purchaseorder_changelist' %}" class="purchase-button purchase-button-secondary">Cancelar</a>
+    <button type="submit" class="purchase-button purchase-button-primary">Confirmar compra</button>
+  </div>
+
+  <div class="purchase-shortcuts">
+    <span><kbd>Alt</kbd> + <kbd>A</kbd> agregar línea</span>
+    <span><kbd>Alt</kbd> + <kbd>B</kbd> buscar producto</span>
+    <span><kbd>Alt</kbd> + <kbd>C</kbd> ir a última línea</span>
+    <span><kbd>Alt</kbd> + <kbd>Enter</kbd> confirmar</span>
+    <span><kbd>Esc</kbd> cerrar búsqueda</span>
+  </div>
+</form>
+
+<template id="line-template">
+  <tr data-row>
+    <td>
+      <input class="purchase-code" name="lines-__prefix__-code" type="text" autocomplete="off">
+      <div class="purchase-row-error" data-error-for="code"></div>
+    </td>
+    <td>
+      <div class="purchase-line-control">
+        <input class="purchase-name" name="lines-__prefix__-name" type="text" autocomplete="off">
+        <button class="purchase-search-button" type="button" title="Buscar producto" aria-label="Buscar producto">
+          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+            <path d="M8.5 14a5.5 5.5 0 1 1 3.89-1.61L16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+      <input name="lines-__prefix__-material" type="hidden">
+    </td>
+    <td>
+      <input class="purchase-number" name="lines-__prefix__-quantity" type="text" inputmode="numeric">
+    </td>
+    <td>
+      <input class="purchase-number" name="lines-__prefix__-unit_cost" type="text" inputmode="numeric">
+    </td>
+    <td>
+      <input class="purchase-number" name="lines-__prefix__-sale_price" type="text" inputmode="numeric">
+    </td>
+    <td>
+      <select class="purchase-category" name="lines-__prefix__-category">
+        <option value="">---------</option>
+        {% for category in categories %}
+          <option value="{{ category.pk }}">{{ category.name }}</option>
+        {% endfor %}
+      </select>
+    </td>
+    <td>
+      <input class="purchase-number purchase-margin" name="lines-__prefix__-margin_percent" type="text" inputmode="decimal" readonly>
+    </td>
+  </tr>
+</template>
+
+<div class="purchase-modal" id="product-search-modal" hidden>
+  <div class="purchase-modal-panel" role="dialog" aria-modal="true" aria-labelledby="product-search-title">
+    <div class="purchase-modal-header">
+      <h2 class="purchase-modal-title" id="product-search-title">Buscar producto</h2>
+      <button class="purchase-modal-close" type="button" id="product-search-close" aria-label="Cerrar">×</button>
+    </div>
+    <input class="purchase-search-input" id="product-search-input" type="search" autocomplete="off" placeholder="Código o nombre">
+    <div class="purchase-search-results" id="product-search-results"></div>
+  </div>
+</div>
+
+<script>
+  (() => {
+    const body = document.querySelector("#line-body");
+    const template = document.querySelector("#line-template");
+    const totalRows = document.querySelector("#total-rows");
+    const form = document.querySelector("#purchase-form");
+    const summaryLines = document.querySelector("#summary-lines");
+    const summaryUnits = document.querySelector("#summary-units");
+    const summaryCost = document.querySelector("#summary-cost");
+    const summarySale = document.querySelector("#summary-sale");
+    const lookupUrl = "{% url 'admin:catalog_product_lookup' %}";
+    const searchUrl = "{% url 'admin:catalog_product_search' %}";
+    const searchModal = document.querySelector("#product-search-modal");
+    const searchInput = document.querySelector("#product-search-input");
+    const searchResults = document.querySelector("#product-search-results");
+    const searchClose = document.querySelector("#product-search-close");
+    let activeSearchRow = null;
+    let searchTimer = null;
+
+    const getField = (row, suffix) => row.querySelector(`[name$="-${suffix}"]`);
+    const isLastRow = (row) => row === body.querySelector("tr:last-child");
+    const rowHasValue = (row) => Array.from(row.querySelectorAll("input, select"))
+      .some((field) => field.type !== "hidden" && field.value.trim() !== "");
+    const parseMoney = (value) => {
+      const digits = value.replace(/\D+/g, "");
+      return digits ? Number(digits) : 0;
+    };
+    const formatGuarani = (value) => `₲ ${Math.round(value).toLocaleString("es-PY")}`;
+    const formatPercent = (value) => {
+      if (!Number.isFinite(value)) {
+        return "";
+      }
+      return value.toFixed(2);
+    };
+
+    const focusRow = (row) => {
+      const codeField = getField(row, "code");
+      const nameField = getField(row, "name");
+      (codeField.value ? nameField : codeField).focus();
+    };
+
+    const lastRow = () => body.querySelector("tr:last-child");
+    const activeRow = () => document.activeElement.closest?.("[data-row]");
+    const setRowError = (row, message) => {
+      const error = row.querySelector('[data-error-for="code"]');
+      if (error) {
+        error.textContent = message;
+      }
+    };
+
+    const addRow = () => {
+      const index = Number(totalRows.value);
+      const html = template.innerHTML.replaceAll("__prefix__", index);
+      body.insertAdjacentHTML("beforeend", html);
+      const row = body.querySelector("tr:last-child");
+      totalRows.value = index + 1;
+      return row;
+    };
+
+    const fillProduct = (row, data) => {
+      getField(row, "code").value = data.code || getField(row, "code").value;
+      getField(row, "name").value = data.name || "";
+      getField(row, "name").readOnly = true;
+      getField(row, "category").value = data.category_id || "";
+      getField(row, "unit_cost").value = data.cost_price || "";
+      getField(row, "sale_price").value = data.sale_price || "";
+      getField(row, "margin_percent").value = data.margin_percent || "";
+      setRowError(row, "");
+      updateSummary();
+    };
+
+    const updateSummary = () => {
+      let lines = 0;
+      let units = 0;
+      let totalCost = 0;
+      let totalSale = 0;
+
+      body.querySelectorAll("[data-row]").forEach((row) => {
+        if (!rowHasValue(row)) {
+          return;
+        }
+
+        const quantity = parseMoney(getField(row, "quantity").value);
+        const unitCost = parseMoney(getField(row, "unit_cost").value);
+        const salePrice = parseMoney(getField(row, "sale_price").value);
+
+        lines += 1;
+        units += quantity;
+        totalCost += quantity * unitCost;
+        totalSale += quantity * salePrice;
+      });
+
+      summaryLines.textContent = String(lines);
+      summaryUnits.textContent = String(units);
+      summaryCost.textContent = formatGuarani(totalCost);
+      summarySale.textContent = formatGuarani(totalSale);
+    };
+
+    const ensureTrailingRow = (row) => {
+      if (isLastRow(row) && rowHasValue(row)) {
+        addRow();
+      }
+    };
+
+    const updateMargin = (row) => {
+      const cost = parseMoney(getField(row, "unit_cost").value);
+      const price = parseMoney(getField(row, "sale_price").value);
+      const marginField = getField(row, "margin_percent");
+
+      if (!cost || !price) {
+        marginField.value = "";
+        return;
+      }
+
+      marginField.value = formatPercent(((price - cost) / cost) * 100);
+    };
+
+    const lookupProduct = async (row) => {
+      const codeField = getField(row, "code");
+      const code = codeField.value.trim();
+      const nameField = getField(row, "name");
+
+      if (!code) {
+        nameField.readOnly = false;
+        setRowError(row, "");
+        return;
+      }
+
+      const response = await fetch(`${lookupUrl}?code=${encodeURIComponent(code)}`, {
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+      });
+      const data = await response.json();
+
+      if (data.found) {
+        fillProduct(row, { ...data, code });
+      } else {
+        nameField.readOnly = false;
+        setRowError(row, "Código no existe. Dejá vacío para producto nuevo.");
+        updateMargin(row);
+      }
+      updateSummary();
+    };
+
+    const renderSearchResults = (products) => {
+      if (!products.length) {
+        searchResults.replaceChildren();
+        const empty = document.createElement("div");
+        empty.className = "purchase-search-result";
+        empty.textContent = "Sin resultados";
+        searchResults.appendChild(empty);
+        return;
+      }
+
+      searchResults.replaceChildren();
+      products.forEach((product, index) => {
+        const button = document.createElement("button");
+        const copy = document.createElement("span");
+        const main = document.createElement("span");
+        const meta = document.createElement("span");
+        const stats = document.createElement("span");
+
+        button.className = "purchase-search-result";
+        button.type = "button";
+        button.dataset.index = String(index);
+        copy.className = "purchase-search-copy";
+        main.className = "purchase-search-main";
+        main.textContent = `${product.code} · ${product.name}`;
+        meta.className = "purchase-search-meta";
+        meta.textContent = `${product.category_name || ""} · ${product.supplier_name || ""}`;
+        stats.className = "purchase-search-stats";
+        stats.innerHTML = `
+          <span>Stock ${product.stock || 0}</span>
+          <span>Costo ${formatGuarani(product.cost_price || 0)}</span>
+          <span>Precio ${formatGuarani(product.sale_price || 0)}</span>
+        `;
+        copy.append(main, meta);
+        button.append(copy, stats);
+        searchResults.appendChild(button);
+      });
+
+      searchResults.querySelectorAll("[data-index]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const product = products[Number(button.dataset.index)];
+          if (activeSearchRow) {
+            fillProduct(activeSearchRow, product);
+          }
+          closeSearch();
+        });
+      });
+    };
+
+    const searchProducts = async () => {
+      const response = await fetch(`${searchUrl}?q=${encodeURIComponent(searchInput.value.trim())}`, {
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+      });
+      const data = await response.json();
+      renderSearchResults(data.results || []);
+    };
+
+    const openSearch = (row) => {
+      activeSearchRow = row;
+      searchModal.hidden = false;
+      searchInput.value = getField(row, "name").value || getField(row, "code").value;
+      searchInput.focus();
+      searchProducts();
+    };
+
+    const closeSearch = () => {
+      searchModal.hidden = true;
+      activeSearchRow = null;
+    };
+
+    body.addEventListener("input", (event) => {
+      const row = event.target.closest("[data-row]");
+      if (row) {
+        if (event.target.name.endsWith("-code")) {
+          setRowError(row, "");
+        }
+        if (
+          event.target.name.endsWith("-unit_cost") ||
+          event.target.name.endsWith("-sale_price")
+        ) {
+          updateMargin(row);
+        }
+        ensureTrailingRow(row);
+        updateSummary();
+      }
+    });
+
+    body.addEventListener("click", (event) => {
+      const button = event.target.closest(".purchase-search-button");
+      if (!button) {
+        return;
+      }
+
+      const row = button.closest("[data-row]");
+      if (row) {
+        openSearch(row);
+      }
+    });
+
+    body.addEventListener("blur", async (event) => {
+      const row = event.target.closest("[data-row]");
+      if (row && event.target.name.endsWith("-code")) {
+        await lookupProduct(row);
+      }
+    }, true);
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !searchModal.hidden) {
+        event.preventDefault();
+        closeSearch();
+        return;
+      }
+
+      if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+      if (key === "a") {
+        event.preventDefault();
+        focusRow(addRow());
+      }
+
+      if (key === "c") {
+        event.preventDefault();
+        focusRow(lastRow() || addRow());
+      }
+
+      if (key === "b") {
+        event.preventDefault();
+        openSearch(activeRow() || lastRow() || addRow());
+      }
+
+      if (event.key === "Enter") {
+        event.preventDefault();
+        form.requestSubmit();
+      }
+    });
+
+    searchClose.addEventListener("click", closeSearch);
+    searchModal.addEventListener("click", (event) => {
+      if (event.target === searchModal) {
+        closeSearch();
+      }
+    });
+    searchInput.addEventListener("input", () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(searchProducts, 180);
+    });
+
+    addRow();
+    updateSummary();
+  })();
+</script>
+{% endblock %}

@@ -95,9 +95,9 @@ class Product(models.Model):
     @classmethod
     def generate_code(cls) -> str:
         year_prefix = timezone.now().strftime("%y")
-        current_year_codes = cls.objects.filter(code__startswith=year_prefix).values_list(
-            "code", flat=True
-        )
+        current_year_codes = cls.objects.filter(
+            code__startswith=year_prefix
+        ).values_list("code", flat=True)
 
         max_sequence = 0
         for existing_code in current_year_codes:
@@ -146,3 +146,76 @@ class ProductImage(models.Model):
 
     def __str__(self):
         return f"Imagen de {self.product.name} ({self.id})"
+
+
+class PurchaseOrder(models.Model):
+    supplier = models.ForeignKey(
+        Supplier,
+        verbose_name="Proveedor",
+        on_delete=models.PROTECT,
+        related_name="purchase_orders",
+    )
+    date = models.DateField("Fecha", default=timezone.localdate)
+    invoice_number = models.CharField("Factura o comprobante nro.", max_length=80, blank=True)
+    notes = models.TextField("Notas", blank=True)
+    created_by = models.ForeignKey(
+        "auth.User",
+        verbose_name="Creado por",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="purchase_orders",
+    )
+    created_at = models.DateTimeField("Creado", auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date", "-created_at"]
+        verbose_name = "Compra"
+        verbose_name_plural = "Compras"
+
+    def __str__(self):
+        return f"Compra #{self.pk} - {self.supplier} ({self.date:%d/%m/%Y})"
+
+
+class PurchaseOrderLine(models.Model):
+    order = models.ForeignKey(
+        PurchaseOrder,
+        verbose_name="Compra",
+        on_delete=models.CASCADE,
+        related_name="lines",
+    )
+    product = models.ForeignKey(
+        Product,
+        verbose_name="Producto existente",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="purchase_lines",
+    )
+    product_name = models.CharField("Producto", max_length=300)
+    quantity = models.PositiveIntegerField("Cantidad")
+    unit_cost = models.PositiveIntegerField("Costo unitario")
+    category = models.ForeignKey(
+        Category,
+        verbose_name="Categoría",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="purchase_lines",
+    )
+    material = models.CharField("Material", max_length=200, blank=True)
+    margin_percent = models.DecimalField(
+        "Margen %",
+        max_digits=6,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        ordering = ["id"]
+        verbose_name = "Línea de compra"
+        verbose_name_plural = "Líneas de compra"
+
+    def __str__(self):
+        return f"{self.product_name} x {self.quantity}"

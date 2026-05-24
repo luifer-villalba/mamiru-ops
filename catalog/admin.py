@@ -6,10 +6,31 @@ from django.contrib import admin, messages
 from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import Group, User
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import transaction
+from django.db.models import F, Q
+from django.http import JsonResponse
+from django.shortcuts import redirect, render
+from django.urls import path, reverse
+from django.utils import timezone
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 
-from .models import Category, Product, ProductImage, Supplier
+from catalog.management.commands.import_mamiru_stock import (
+    clean_percent,
+    clean_price,
+    clean_text,
+    unique_slug,
+)
+
+from .models import (
+    Category,
+    Product,
+    ProductImage,
+    PurchaseOrder,
+    PurchaseOrderLine,
+    Supplier,
+)
 
 
 def format_guarani(value):
@@ -32,8 +53,256 @@ def calculate_margin_percent(cost_price, sale_price):
     if not cost_price:
         return None
 
-    margin = ((Decimal(sale_price) - Decimal(cost_price)) / Decimal(cost_price)) * Decimal("100")
+    margin = (
+        (Decimal(sale_price) - Decimal(cost_price)) / Decimal(cost_price)
+    ) * Decimal("100")
     return margin.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def parse_positive_int(value, field_name):
+    number = clean_price(value)
+    if number <= 0:
+        raise ValidationError(f"{field_name} debe ser mayor a cero.")
+    return number
+
+
+def product_lookup_view(request):
+    code = clean_text(request.GET.get("code", ""))
+    product = (
+        Product.objects.select_related("category", "supplier")
+        .filter(code=code)
+        .first()
+    )
+    if not product:
+        return JsonResponse({"found": False})
+
+    return JsonResponse(
+        {
+            "found": True,
+            "name": product.name,
+            "category_id": product.category_id,
+            "category_name": product.category.name,
+            "supplier_name": product.supplier.name,
+            "cost_price": product.cost_price,
+            "sale_price": product.sale_price,
+            "stock": product.stock,
+            "margin_percent": (
+                str(product.margin_percent)
+                if product.margin_percent is not None
+                else ""
+            ),
+        }
+    )
+
+
+def product_search_view(request):
+    query = clean_text(request.GET.get("q", ""))
+    products = Product.objects.select_related("category", "supplier")
+    if query:
+        products = products.filter(Q(code__icontains=query) | Q(name__icontains=query))
+    products = products.order_by("code", "name")[:12]
+
+    return JsonResponse(
+        {
+            "results": [
+                {
+                    "code": product.code,
+                    "name": product.name,
+                    "category_id": product.category_id,
+                    "category_name": product.category.name,
+                    "supplier_name": product.supplier.name,
+                    "cost_price": product.cost_price,
+                    "sale_price": product.sale_price,
+                    "stock": product.stock,
+                    "margin_percent": (
+                        str(product.margin_percent)
+                        if product.margin_percent is not None
+                        else ""
+                    ),
+                }
+                for product in products
+            ]
+        }
+    )
+
+
+def build_purchase_lines(post_data):
+    total_rows = int(post_data.get("total_rows", "0") or 0)
+    lines = []
+    errors = []
+
+    for index in range(total_rows):
+        prefix = f"lines-{index}-"
+        code = clean_text(post_data.get(f"{prefix}code", ""))
+        name = clean_text(post_data.get(f"{prefix}name", ""))
+        quantity_raw = post_data.get(f"{prefix}quantity", "")
+        unit_cost_raw = post_data.get(f"{prefix}unit_cost", "")
+        sale_price_raw = post_data.get(f"{prefix}sale_price", "")
+        category_id = post_data.get(f"{prefix}category", "")
+        material = clean_text(post_data.get(f"{prefix}material", ""))
+        margin_percent = clean_percent(post_data.get(f"{prefix}margin_percent", ""))
+
+        if not any(
+            [code, name, quantity_raw, unit_cost_raw, sale_price_raw, category_id, material]
+        ):
+            continue
+
+        try:
+            quantity = parse_positive_int(quantity_raw, "Cantidad")
+            unit_cost = parse_positive_int(unit_cost_raw, "Costo")
+        except ValidationError as exc:
+            errors.append(f"Fila {index + 1}: {exc.message}")
+            continue
+
+        sale_price = clean_price(sale_price_raw)
+        if margin_percent is None and sale_price:
+            margin_percent = calculate_margin_percent(unit_cost, sale_price)
+
+        product = Product.objects.filter(code=code).first() if code else None
+        if product:
+            name = product.name
+            category = product.category
+            if not sale_price:
+                sale_price = product.sale_price
+            if margin_percent is None:
+                margin_percent = product.margin_percent
+            if not material:
+                material = product.material
+        else:
+            if code:
+                errors.append(
+                    f"Fila {index + 1}: el código {code} no existe. "
+                    "Dejá el código vacío para crear un producto nuevo."
+                )
+                continue
+            if not name:
+                errors.append(
+                    f"Fila {index + 1}: el nombre es obligatorio para productos nuevos."
+                )
+                continue
+            category = Category.objects.filter(pk=category_id).first()
+            if category is None:
+                errors.append(
+                    f"Fila {index + 1}: la categoría es obligatoria para productos nuevos."
+                )
+                continue
+
+        lines.append(
+            {
+                "code": code,
+                "product": product,
+                "product_name": name,
+                "quantity": quantity,
+                "unit_cost": unit_cost,
+                "sale_price": sale_price,
+                "category": category,
+                "material": material,
+                "margin_percent": margin_percent,
+            }
+        )
+
+    if not lines:
+        errors.append("Agregá al menos una línea de compra.")
+
+    return lines, errors
+
+
+def new_purchase_view(request):
+    if not request.user.has_perm("catalog.add_purchaseorder"):
+        raise PermissionDenied
+
+    categories = Category.objects.all()
+    suppliers = Supplier.objects.all()
+    context = {
+        **admin.site.each_context(request),
+        "title": "Nueva compra",
+        "categories": categories,
+        "suppliers": suppliers,
+        "today": timezone.localdate().isoformat(),
+        "opts": PurchaseOrder._meta,
+    }
+
+    if request.method == "POST":
+        supplier = Supplier.objects.filter(pk=request.POST.get("supplier")).first()
+        date = request.POST.get("date") or timezone.localdate()
+        invoice_number = clean_text(request.POST.get("invoice_number", ""))
+        notes = clean_text(request.POST.get("notes", ""))
+        lines, errors = build_purchase_lines(request.POST)
+
+        if supplier is None:
+            errors.append("Seleccioná un proveedor.")
+
+        if errors:
+            for error in errors:
+                messages.error(request, error)
+            return render(request, "admin/catalog/purchase/new.html", context)
+
+        existing_slugs = set(Product.objects.values_list("slug", flat=True))
+        created_count = 0
+        updated_count = 0
+
+        with transaction.atomic():
+            order = PurchaseOrder.objects.create(
+                supplier=supplier,
+                date=date,
+                invoice_number=invoice_number,
+                notes=notes,
+                created_by=request.user,
+            )
+
+            for line in lines:
+                product = line["product"]
+                line_product = product
+
+                if product:
+                    Product.objects.filter(pk=product.pk).update(
+                        stock=F("stock") + line["quantity"]
+                    )
+                    updated_count += 1
+                else:
+                    slug = unique_slug(line["product_name"], existing_slugs)
+                    Product.objects.create(
+                        name=line["product_name"],
+                        slug=slug,
+                        category=line["category"],
+                        supplier=supplier,
+                        material=line["material"],
+                        cost_price=line["unit_cost"],
+                        margin_percent=line["margin_percent"],
+                        sale_price=line["sale_price"]
+                        or (
+                            calculate_sale_price(
+                                line["unit_cost"],
+                                line["margin_percent"],
+                            )
+                            if line["margin_percent"] is not None
+                            else 0
+                        ),
+                        stock=line["quantity"],
+                        status=Product.Status.ACTIVE,
+                    )
+                    line_product = None
+                    created_count += 1
+
+                PurchaseOrderLine.objects.create(
+                    order=order,
+                    product=line_product,
+                    product_name=line["product_name"],
+                    quantity=line["quantity"],
+                    unit_cost=line["unit_cost"],
+                    category=line["category"],
+                    material=line["material"],
+                    margin_percent=line["margin_percent"],
+                )
+
+        messages.success(
+            request,
+            f"Compra confirmada: {updated_count} producto(s) actualizados, "
+            f"{created_count} producto(s) nuevos.",
+        )
+        return redirect(reverse("admin:catalog_purchaseorder_change", args=[order.pk]))
+
+    return render(request, "admin/catalog/purchase/new.html", context)
 
 
 class ProductAdminForm(forms.ModelForm):
@@ -103,7 +372,9 @@ class ProductAdminForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         if self.instance and self.instance.pk:
             self.initial["cost_price"] = format_guarani(self.instance.cost_price)
-            self.initial["wholesale_cost"] = format_guarani(self.instance.wholesale_cost)
+            self.initial["wholesale_cost"] = format_guarani(
+                self.instance.wholesale_cost
+            )
             self.initial["sale_price"] = format_guarani(self.instance.sale_price)
 
 
@@ -237,17 +508,132 @@ class ProductAdmin(ModelAdmin):
     @admin.action(description="Marcar seleccionados como Activo")
     def mark_as_active(self, request, queryset):
         updated = queryset.update(status=Product.Status.ACTIVE)
-        self.message_user(request, f"{updated} producto(s) actualizado(s) a Activo.", level=messages.SUCCESS)
+        self.message_user(
+            request,
+            f"{updated} producto(s) actualizado(s) a Activo.",
+            level=messages.SUCCESS,
+        )
 
     @admin.action(description="Marcar seleccionados como Sin stock")
     def mark_as_sold_out(self, request, queryset):
         updated = queryset.update(status=Product.Status.SOLD_OUT)
-        self.message_user(request, f"{updated} producto(s) actualizado(s) a Sin stock.", level=messages.SUCCESS)
+        self.message_user(
+            request,
+            f"{updated} producto(s) actualizado(s) a Sin stock.",
+            level=messages.SUCCESS,
+        )
 
     @admin.action(description="Marcar seleccionados como Oculto")
     def mark_as_hidden(self, request, queryset):
         updated = queryset.update(status=Product.Status.HIDDEN)
-        self.message_user(request, f"{updated} producto(s) actualizado(s) a Oculto.", level=messages.SUCCESS)
+        self.message_user(
+            request,
+            f"{updated} producto(s) actualizado(s) a Oculto.",
+            level=messages.SUCCESS,
+        )
 
     class Media:
         js = ["catalog/js/product_price_format.js"]
+
+
+class PurchaseOrderLineInline(TabularInline):
+    model = PurchaseOrderLine
+    extra = 0
+    can_delete = False
+    fields = [
+        "product",
+        "product_name",
+        "quantity",
+        "unit_cost",
+        "category",
+        "material",
+        "margin_percent",
+    ]
+    readonly_fields = fields
+    tab = True
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(PurchaseOrder)
+class PurchaseOrderAdmin(ModelAdmin):
+    list_display = [
+        "id",
+        "supplier",
+        "invoice_number",
+        "date",
+        "line_count",
+        "created_by",
+        "created_at",
+    ]
+    list_filter = ["supplier", "date"]
+    search_fields = [
+        "invoice_number",
+        "supplier__name",
+        "lines__product_name",
+        "lines__product__code",
+    ]
+    readonly_fields = ["created_by", "created_at"]
+    inlines = [PurchaseOrderLineInline]
+    fieldsets = [
+        (
+            "Compra",
+            {
+                "fields": ["supplier", "invoice_number", "date", "notes"],
+            },
+        ),
+        (
+            "Auditoría",
+            {
+                "fields": ["created_by", "created_at"],
+                "classes": ["collapse"],
+            },
+        ),
+    ]
+
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        return queryset.select_related("supplier", "created_by").prefetch_related(
+            "lines"
+        )
+
+    @admin.display(description="Líneas")
+    def line_count(self, obj):
+        return obj.lines.count()
+
+    def has_add_permission(self, request):
+        return request.user.has_perm("catalog.add_purchaseorder")
+
+    def add_view(self, request, form_url="", extra_context=None):
+        return redirect("admin:catalog_purchase_new")
+
+
+_admin_get_urls = admin.site.get_urls
+
+
+def get_admin_urls():
+    custom_urls = [
+        path(
+            "catalog/purchase/new/",
+            admin.site.admin_view(new_purchase_view),
+            name="catalog_purchase_new",
+        ),
+        path(
+            "catalog/product/lookup/",
+            admin.site.admin_view(product_lookup_view),
+            name="catalog_product_lookup",
+        ),
+        path(
+            "catalog/product/search/",
+            admin.site.admin_view(product_search_view),
+            name="catalog_product_search",
+        ),
+    ]
+    return custom_urls + _admin_get_urls()
+
+
+admin.site.get_urls = get_admin_urls
