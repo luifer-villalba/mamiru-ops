@@ -13,6 +13,7 @@ from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import path, reverse
 from django.utils import timezone
+from django.utils.html import format_html, format_html_join
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 
@@ -64,6 +65,11 @@ def parse_positive_int(value, field_name):
     if number <= 0:
         raise ValidationError(f"{field_name} debe ser mayor a cero.")
     return number
+
+
+def parse_optional_pk(value):
+    value = clean_text(str(value or ""))
+    return int(value) if value.isdigit() else None
 
 
 def product_lookup_view(request):
@@ -138,7 +144,7 @@ def build_purchase_lines(post_data):
         quantity_raw = post_data.get(f"{prefix}quantity", "")
         unit_cost_raw = post_data.get(f"{prefix}unit_cost", "")
         sale_price_raw = post_data.get(f"{prefix}sale_price", "")
-        category_id = post_data.get(f"{prefix}category", "")
+        category_id = parse_optional_pk(post_data.get(f"{prefix}category", ""))
         material = clean_text(post_data.get(f"{prefix}material", ""))
         margin_percent = clean_percent(post_data.get(f"{prefix}margin_percent", ""))
 
@@ -180,7 +186,11 @@ def build_purchase_lines(post_data):
                     f"Fila {index + 1}: el nombre es obligatorio para productos nuevos."
                 )
                 continue
-            category = Category.objects.filter(pk=category_id).first()
+            category = (
+                Category.objects.filter(pk=category_id).first()
+                if category_id is not None
+                else None
+            )
             if category is None:
                 errors.append(
                     f"Fila {index + 1}: la categoría es obligatoria para productos nuevos."
@@ -223,7 +233,12 @@ def new_purchase_view(request):
     }
 
     if request.method == "POST":
-        supplier = Supplier.objects.filter(pk=request.POST.get("supplier")).first()
+        supplier_id = parse_optional_pk(request.POST.get("supplier"))
+        supplier = (
+            Supplier.objects.filter(pk=supplier_id).first()
+            if supplier_id is not None
+            else None
+        )
         date = request.POST.get("date") or timezone.localdate()
         invoice_number = clean_text(request.POST.get("invoice_number", ""))
         notes = clean_text(request.POST.get("notes", ""))
@@ -261,7 +276,7 @@ def new_purchase_view(request):
                     updated_count += 1
                 else:
                     slug = unique_slug(line["product_name"], existing_slugs)
-                    Product.objects.create(
+                    line_product = Product.objects.create(
                         name=line["product_name"],
                         slug=slug,
                         category=line["category"],
@@ -281,7 +296,6 @@ def new_purchase_view(request):
                         stock=line["quantity"],
                         status=Product.Status.ACTIVE,
                     )
-                    line_product = None
                     created_count += 1
 
                 PurchaseOrderLine.objects.create(
@@ -536,29 +550,6 @@ class ProductAdmin(ModelAdmin):
         js = ["catalog/js/product_price_format.js"]
 
 
-class PurchaseOrderLineInline(TabularInline):
-    model = PurchaseOrderLine
-    extra = 0
-    can_delete = False
-    fields = [
-        "product",
-        "product_name",
-        "quantity",
-        "unit_cost",
-        "category",
-        "material",
-        "margin_percent",
-    ]
-    readonly_fields = fields
-    tab = True
-
-    def has_add_permission(self, request, obj=None):
-        return False
-
-    def has_change_permission(self, request, obj=None):
-        return False
-
-
 @admin.register(PurchaseOrder)
 class PurchaseOrderAdmin(ModelAdmin):
     list_display = [
@@ -577,8 +568,7 @@ class PurchaseOrderAdmin(ModelAdmin):
         "lines__product_name",
         "lines__product__code",
     ]
-    readonly_fields = ["created_by", "created_at"]
-    inlines = [PurchaseOrderLineInline]
+    readonly_fields = ["created_by", "created_at", "line_summary"]
     fieldsets = [
         (
             "Compra",
@@ -593,6 +583,12 @@ class PurchaseOrderAdmin(ModelAdmin):
                 "classes": ["collapse"],
             },
         ),
+        (
+            "Líneas de compra",
+            {
+                "fields": ["line_summary"],
+            },
+        ),
     ]
 
     def get_queryset(self, request):
@@ -604,6 +600,119 @@ class PurchaseOrderAdmin(ModelAdmin):
     @admin.display(description="Líneas")
     def line_count(self, obj):
         return obj.lines.count()
+
+    @admin.display(description="Resumen de líneas")
+    def line_summary(self, obj):
+        if not obj or not obj.pk:
+            return "Guardá la compra para ver sus líneas."
+
+        lines = list(
+            obj.lines.select_related("product", "category").order_by("id")
+        )
+        if not lines:
+            return "Sin líneas."
+
+        total_units = sum(line.quantity for line in lines)
+        total_cost = sum(line.quantity * line.unit_cost for line in lines)
+
+        def product_code_link(line):
+            if not line.product:
+                return "Nuevo"
+
+            return format_html(
+                '<a href="{}">{}</a>',
+                reverse("admin:catalog_product_change", args=[line.product_id]),
+                line.product.code,
+            )
+
+        rows = format_html_join(
+            "",
+            """
+            <tr>
+              <td>{}</td>
+              <td>{}</td>
+              <td class="po-num">{}</td>
+              <td class="po-num">{}</td>
+              <td>{}</td>
+              <td>{}</td>
+              <td class="po-num">{}</td>
+            </tr>
+            """,
+            (
+                (
+                    product_code_link(line),
+                    line.product_name,
+                    line.quantity,
+                    format_guarani(line.unit_cost),
+                    line.category.name if line.category else "-",
+                    line.material or "-",
+                    line.margin_percent if line.margin_percent is not None else "-",
+                )
+                for line in lines
+            ),
+        )
+
+        return format_html(
+            """
+            <style>
+              .po-summary-table {{
+                border: 1px solid #d8dee8;
+                border-collapse: collapse;
+                border-radius: 8px;
+                overflow: hidden;
+                width: 100%;
+              }}
+              .po-summary-table th,
+              .po-summary-table td {{
+                border-bottom: 1px solid #e5e7eb;
+                padding: 10px 12px;
+                text-align: left;
+              }}
+              .po-summary-table th {{
+                background: #f8fafc;
+                color: #374151;
+                font-weight: 700;
+              }}
+              .po-summary-table tr:nth-child(even) td {{
+                background: rgba(148, 163, 184, 0.04);
+              }}
+              .po-summary-table tr:last-child td {{
+                border-bottom: 0;
+              }}
+              .po-num {{
+                font-variant-numeric: tabular-nums;
+                text-align: right !important;
+              }}
+              .po-summary-total {{
+                display: flex;
+                gap: 18px;
+                justify-content: flex-end;
+                margin-top: 12px;
+              }}
+            </style>
+            <table class="po-summary-table">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Producto</th>
+                  <th class="po-num">Qty</th>
+                  <th class="po-num">Costo unit.</th>
+                  <th>Categoría</th>
+                  <th>Material</th>
+                  <th class="po-num">Margen %</th>
+                </tr>
+              </thead>
+              <tbody>{}</tbody>
+            </table>
+            <div class="po-summary-total">
+              <strong>Unidades: {}</strong>
+              <strong>Total costo: {}</strong>
+            </div>
+            """,
+            rows,
+            total_units,
+            format_guarani(total_cost),
+        )
 
     def has_add_permission(self, request):
         return request.user.has_perm("catalog.add_purchaseorder")

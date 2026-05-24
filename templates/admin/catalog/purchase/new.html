@@ -192,6 +192,8 @@
   }
 
   .purchase-code {
+    background: #f3f4f6;
+    color: #6b7280;
     font-variant-numeric: tabular-nums;
   }
 
@@ -577,7 +579,7 @@
 <template id="line-template">
   <tr data-row>
     <td>
-      <input class="purchase-code" name="lines-__prefix__-code" type="text" autocomplete="off">
+      <input class="purchase-code" name="lines-__prefix__-code" type="text" autocomplete="off" readonly tabindex="-1" placeholder="Auto">
       <div class="purchase-row-error" data-error-for="code"></div>
     </td>
     <td>
@@ -635,7 +637,6 @@
     const summaryUnits = document.querySelector("#summary-units");
     const summaryCost = document.querySelector("#summary-cost");
     const summarySale = document.querySelector("#summary-sale");
-    const lookupUrl = "{% url 'admin:catalog_product_lookup' %}";
     const searchUrl = "{% url 'admin:catalog_product_search' %}";
     const searchModal = document.querySelector("#product-search-modal");
     const searchInput = document.querySelector("#product-search-input");
@@ -661,9 +662,8 @@
     };
 
     const focusRow = (row) => {
-      const codeField = getField(row, "code");
       const nameField = getField(row, "name");
-      (codeField.value ? nameField : codeField).focus();
+      nameField.focus();
     };
 
     const lastRow = () => body.querySelector("tr:last-child");
@@ -742,32 +742,6 @@
       marginField.value = formatPercent(((price - cost) / cost) * 100);
     };
 
-    const lookupProduct = async (row) => {
-      const codeField = getField(row, "code");
-      const code = codeField.value.trim();
-      const nameField = getField(row, "name");
-
-      if (!code) {
-        nameField.readOnly = false;
-        setRowError(row, "");
-        return;
-      }
-
-      const response = await fetch(`${lookupUrl}?code=${encodeURIComponent(code)}`, {
-        headers: { "X-Requested-With": "XMLHttpRequest" },
-      });
-      const data = await response.json();
-
-      if (data.found) {
-        fillProduct(row, { ...data, code });
-      } else {
-        nameField.readOnly = false;
-        setRowError(row, "Código no existe. Dejá vacío para producto nuevo.");
-        updateMargin(row);
-      }
-      updateSummary();
-    };
-
     const renderSearchResults = (products) => {
       if (!products.length) {
         searchResults.replaceChildren();
@@ -827,7 +801,7 @@
     const openSearch = (row) => {
       activeSearchRow = row;
       searchModal.hidden = false;
-      searchInput.value = getField(row, "name").value || getField(row, "code").value;
+      searchInput.value = getField(row, "name").value;
       searchInput.focus();
       searchProducts();
     };
@@ -840,9 +814,6 @@
     body.addEventListener("input", (event) => {
       const row = event.target.closest("[data-row]");
       if (row) {
-        if (event.target.name.endsWith("-code")) {
-          setRowError(row, "");
-        }
         if (
           event.target.name.endsWith("-unit_cost") ||
           event.target.name.endsWith("-sale_price")
@@ -865,13 +836,6 @@
         openSearch(row);
       }
     });
-
-    body.addEventListener("blur", async (event) => {
-      const row = event.target.closest("[data-row]");
-      if (row && event.target.name.endsWith("-code")) {
-        await lookupProduct(row);
-      }
-    }, true);
 
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && !searchModal.hidden) {

@@ -31,14 +31,6 @@ class Migration(migrations.Migration):
                         default=django.utils.timezone.localdate, verbose_name="Fecha"
                     ),
                 ),
-                (
-                    "invoice_number",
-                    models.CharField(
-                        blank=True,
-                        max_length=80,
-                        verbose_name="Factura o comprobante nro.",
-                    ),
-                ),
                 ("notes", models.TextField(blank=True, verbose_name="Notas")),
                 (
                     "created_at",

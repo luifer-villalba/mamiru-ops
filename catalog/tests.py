@@ -1,12 +1,13 @@
 from decimal import Decimal
 from unittest import mock
 
+from django.contrib import admin
 from django.contrib.auth import authenticate, get_user_model
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from catalog.admin import ProductAdminForm, build_purchase_lines
+from catalog.admin import ProductAdminForm, PurchaseOrderAdmin, build_purchase_lines
 from config.forms import UsernameOrEmailAuthenticationForm
 
 from .models import Category, Product, PurchaseOrder, PurchaseOrderLine, Supplier
@@ -274,8 +275,9 @@ class PurchaseOrderAdminTests(TestCase):
             PurchaseOrderLine.objects.get(product=self.product).quantity,
             3,
         )
-        self.assertIsNone(
-            PurchaseOrderLine.objects.get(product_name="Aro nuevo").product
+        self.assertEqual(
+            PurchaseOrderLine.objects.get(product_name="Aro nuevo").product,
+            new_product,
         )
 
     def test_new_purchase_rejects_unknown_code(self):
@@ -294,6 +296,52 @@ class PurchaseOrderAdminTests(TestCase):
                 "Dejá el código vacío para crear un producto nuevo.",
                 "Agregá al menos una línea de compra.",
             ],
+        )
+
+    def test_new_purchase_rejects_blank_category_without_value_error(self):
+        lines, errors = build_purchase_lines(
+            self.purchase_payload(
+                total_rows="1",
+                **{
+                    "lines-0-code": "",
+                    "lines-0-name": "Aro manual",
+                    "lines-0-category": "",
+                },
+            )
+        )
+
+        self.assertEqual(lines, [])
+        self.assertEqual(
+            errors,
+            [
+                "Fila 1: la categoría es obligatoria para productos nuevos.",
+                "Agregá al menos una línea de compra.",
+            ],
+        )
+
+    def test_purchase_order_summary_links_to_products(self):
+        order = PurchaseOrder.objects.create(
+            supplier=self.supplier,
+            date=timezone.localdate(),
+            created_by=self.user,
+        )
+        PurchaseOrderLine.objects.create(
+            order=order,
+            product=self.product,
+            product_name=self.product.name,
+            quantity=1,
+            unit_cost=10000,
+            category=self.category,
+            margin_percent=Decimal("40.00"),
+        )
+        admin_instance = PurchaseOrderAdmin(PurchaseOrder, admin.site)
+
+        summary = str(admin_instance.line_summary(order))
+
+        self.assertIn(self.product.code, summary)
+        self.assertIn(
+            reverse("admin:catalog_product_change", args=[self.product.pk]),
+            summary,
         )
 
     def test_new_purchase_rolls_back_if_line_history_fails(self):
