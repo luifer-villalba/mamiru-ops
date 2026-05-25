@@ -26,12 +26,14 @@ from catalog.management.commands.import_mamiru_stock import (
 
 from .models import (
     Category,
+    PriceHistory,
     Product,
     ProductImage,
     PurchaseOrder,
     PurchaseOrderLine,
     Supplier,
 )
+from .price_history import price_history_user
 
 
 def format_guarani(value):
@@ -433,6 +435,32 @@ class ProductImageInline(TabularInline):
     tab = True
 
 
+class PriceHistoryInline(TabularInline):
+    model = PriceHistory
+    extra = 0
+    can_delete = False
+    fields = [
+        "changed_at",
+        "changed_by",
+        "old_cost_price",
+        "new_cost_price",
+        "old_sale_price",
+        "new_sale_price",
+        "old_margin_percent",
+        "new_margin_percent",
+    ]
+    readonly_fields = fields
+    tab = True
+    verbose_name = "Historial de precio"
+    verbose_name_plural = "Historial de precios"
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
 class StockLevelFilter(admin.SimpleListFilter):
     title = "Stock"
     parameter_name = "stock_level"
@@ -471,7 +499,7 @@ class ProductAdmin(ModelAdmin):
     search_fields = ["code", "name"]
     actions = ["mark_as_active", "mark_as_sold_out", "mark_as_hidden"]
     prepopulated_fields = {"slug": ("name",)}
-    inlines = [ProductImageInline]
+    inlines = [ProductImageInline, PriceHistoryInline]
     readonly_fields = ["code", "created_at", "updated_at"]
     fieldsets = [
         (
@@ -518,6 +546,10 @@ class ProductAdmin(ModelAdmin):
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
         return queryset.select_related("category", "supplier")
+
+    def save_model(self, request, obj, form, change):
+        with price_history_user(request.user):
+            super().save_model(request, obj, form, change)
 
     @admin.action(description="Marcar seleccionados como Activo")
     def mark_as_active(self, request, queryset):

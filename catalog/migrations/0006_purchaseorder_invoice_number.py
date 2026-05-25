@@ -3,19 +3,82 @@
 from django.db import migrations, models
 
 
+def add_invoice_number_if_missing(apps, schema_editor):
+    table_name = "catalog_purchaseorder"
+    column_name = "invoice_number"
+
+    with schema_editor.connection.cursor() as cursor:
+        existing_columns = {
+            column.name
+            for column in schema_editor.connection.introspection.get_table_description(
+                cursor,
+                table_name,
+            )
+        }
+
+    if column_name in existing_columns:
+        return
+
+    purchase_order = apps.get_model("catalog", "PurchaseOrder")
+    field = models.CharField(
+        "Factura o comprobante nro.",
+        blank=True,
+        default="",
+        max_length=80,
+    )
+    field.set_attributes_from_name(column_name)
+    schema_editor.add_field(purchase_order, field)
+
+
+def remove_invoice_number_if_present(apps, schema_editor):
+    table_name = "catalog_purchaseorder"
+    column_name = "invoice_number"
+
+    with schema_editor.connection.cursor() as cursor:
+        existing_columns = {
+            column.name
+            for column in schema_editor.connection.introspection.get_table_description(
+                cursor,
+                table_name,
+            )
+        }
+
+    if column_name not in existing_columns:
+        return
+
+    purchase_order = apps.get_model("catalog", "PurchaseOrder")
+    field = models.CharField(
+        "Factura o comprobante nro.",
+        blank=True,
+        max_length=80,
+    )
+    field.set_attributes_from_name(column_name)
+    schema_editor.remove_field(purchase_order, field)
+
+
 class Migration(migrations.Migration):
     dependencies = [
         ("catalog", "0005_purchaseorder_purchaseorderline"),
     ]
 
     operations = [
-        migrations.AddField(
-            model_name="purchaseorder",
-            name="invoice_number",
-            field=models.CharField(
-                blank=True,
-                max_length=80,
-                verbose_name="Factura o comprobante nro.",
-            ),
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                migrations.RunPython(
+                    add_invoice_number_if_missing,
+                    reverse_code=remove_invoice_number_if_present,
+                ),
+            ],
+            state_operations=[
+                migrations.AddField(
+                    model_name="purchaseorder",
+                    name="invoice_number",
+                    field=models.CharField(
+                        blank=True,
+                        max_length=80,
+                        verbose_name="Factura o comprobante nro.",
+                    ),
+                ),
+            ],
         ),
     ]

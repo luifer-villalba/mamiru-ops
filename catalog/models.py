@@ -148,6 +148,50 @@ class ProductImage(models.Model):
         return f"Imagen de {self.product.name} ({self.id})"
 
 
+class PriceHistory(models.Model):
+    product = models.ForeignKey(
+        Product,
+        verbose_name="Producto",
+        on_delete=models.CASCADE,
+        related_name="price_history",
+    )
+    changed_by = models.ForeignKey(
+        "auth.User",
+        verbose_name="Cambiado por",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="price_history_entries",
+    )
+    changed_at = models.DateTimeField("Fecha", auto_now_add=True)
+    old_cost_price = models.PositiveIntegerField("Costo anterior")
+    new_cost_price = models.PositiveIntegerField("Costo nuevo")
+    old_sale_price = models.PositiveIntegerField("Precio anterior")
+    new_sale_price = models.PositiveIntegerField("Precio nuevo")
+    old_margin_percent = models.DecimalField(
+        "Margen anterior %",
+        max_digits=6,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+    new_margin_percent = models.DecimalField(
+        "Margen nuevo %",
+        max_digits=6,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        ordering = ["-changed_at", "-id"]
+        verbose_name = "Historial de precio"
+        verbose_name_plural = "Historial de precios"
+
+    def __str__(self):
+        return f"{self.product} - {self.changed_at:%d/%m/%Y %H:%M}"
+
+
 class PurchaseOrder(models.Model):
     supplier = models.ForeignKey(
         Supplier,

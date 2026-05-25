@@ -7,10 +7,22 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from catalog.admin import ProductAdminForm, PurchaseOrderAdmin, build_purchase_lines
+from catalog.admin import (
+    PriceHistoryInline,
+    ProductAdminForm,
+    PurchaseOrderAdmin,
+    build_purchase_lines,
+)
 from config.forms import UsernameOrEmailAuthenticationForm
 
-from .models import Category, Product, PurchaseOrder, PurchaseOrderLine, Supplier
+from .models import (
+    Category,
+    PriceHistory,
+    Product,
+    PurchaseOrder,
+    PurchaseOrderLine,
+    Supplier,
+)
 
 
 class ProductCodeTests(TestCase):
@@ -146,6 +158,96 @@ class ProductAdminFormPriceSyncTests(TestCase):
 
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(form.cleaned_data["margin_percent"], Decimal("63.64"))
+
+
+class PriceHistoryTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_superuser(
+            username="historial",
+            email="historial@example.com",
+            password="secret",
+        )
+        self.client.force_login(self.user)
+        self.category = Category.objects.create(name="Historial", slug="historial")
+        self.supplier = Supplier.objects.create(name="Proveedor historial")
+        self.product = Product.objects.create(
+            name="Producto historial",
+            slug="producto-historial",
+            category=self.category,
+            supplier=self.supplier,
+            cost_price=10000,
+            margin_percent=Decimal("40.00"),
+            sale_price=14000,
+            stock=1,
+            status=Product.Status.ACTIVE,
+        )
+
+    def admin_payload(self, **overrides):
+        data = {
+            "name": self.product.name,
+            "slug": self.product.slug,
+            "category": self.category.pk,
+            "supplier": self.supplier.pk,
+            "material": self.product.material,
+            "product_type": self.product.product_type,
+            "cost_price": "10.000",
+            "wholesale_cost": "",
+            "margin_percent": "40.00",
+            "sale_price": "14.000",
+            "price_sync_source": "sale_price",
+            "stock": str(self.product.stock),
+            "status": self.product.status,
+            "notes": self.product.notes,
+            "images-TOTAL_FORMS": "0",
+            "images-INITIAL_FORMS": "0",
+            "images-MIN_NUM_FORMS": "0",
+            "images-MAX_NUM_FORMS": "1000",
+            "price_history-TOTAL_FORMS": "0",
+            "price_history-INITIAL_FORMS": "0",
+            "price_history-MIN_NUM_FORMS": "0",
+            "price_history-MAX_NUM_FORMS": "0",
+        }
+        data.update(overrides)
+        return data
+
+    def test_first_save_does_not_create_price_history(self):
+        self.assertEqual(PriceHistory.objects.count(), 0)
+
+    def test_name_change_does_not_create_price_history(self):
+        self.product.name = "Producto historial editado"
+        self.product.save()
+
+        self.assertEqual(PriceHistory.objects.count(), 0)
+
+    def test_admin_price_change_creates_price_history_with_user(self):
+        response = self.client.post(
+            reverse("admin:catalog_product_change", args=[self.product.pk]),
+            data=self.admin_payload(sale_price="15.000"),
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("admin:catalog_product_changelist"),
+            fetch_redirect_response=False,
+        )
+        history = PriceHistory.objects.get()
+        self.assertEqual(history.product, self.product)
+        self.assertEqual(history.changed_by, self.user)
+        self.assertEqual(history.old_cost_price, 10000)
+        self.assertEqual(history.new_cost_price, 10000)
+        self.assertEqual(history.old_sale_price, 14000)
+        self.assertEqual(history.new_sale_price, 15000)
+        self.assertEqual(history.old_margin_percent, Decimal("40.00"))
+        self.assertEqual(history.new_margin_percent, Decimal("50.00"))
+
+    def test_price_history_inline_is_read_only_on_product_admin(self):
+        from catalog.admin import ProductAdmin
+
+        inline = ProductAdmin.inlines[1]
+
+        self.assertEqual(inline, PriceHistoryInline)
+        self.assertIn("changed_at", inline.readonly_fields)
+        self.assertIn("changed_by", inline.readonly_fields)
 
 
 class PurchaseOrderAdminTests(TestCase):

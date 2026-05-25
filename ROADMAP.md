@@ -13,6 +13,7 @@ Prefijo de tickets: `MOP-` (Mamiru Ops), arranca en `MOP-100`.
 - Importador CSV (`import_mamiru_stock`)
 - API REST de solo lectura (`/api/products/`, `/api/categories/`, `/api/suppliers/`)
 - Órdenes de compra (PurchaseOrder + PurchaseOrderLine) con ajuste de stock automático
+- MOP-100 · Historial de precios con auditoría de cambios en producto
 - Login con usuario o email
 - CI con GitHub Actions (tests + ruff)
 - Deploy en Railway con Docker
@@ -26,41 +27,6 @@ _(nada actualmente)_
 ---
 
 ## 📋 Backlog
-
-### MOP-100 · Historial de Precios
-**Prioridad:** Alta  
-**Esfuerzo:** Bajo
-
-**Descripción:**  
-Registrar automáticamente cada cambio de precio o costo en un producto, sin intervención del operador.
-
-**Modelos:**
-```
-PriceHistory:
-  product              FK → Product
-  changed_by           FK → User (nullable)
-  changed_at           DateTimeField (auto)
-  old_cost_price       PositiveIntegerField
-  new_cost_price       PositiveIntegerField
-  old_sale_price       PositiveIntegerField
-  new_sale_price       PositiveIntegerField
-  old_margin_percent   DecimalField
-  new_margin_percent   DecimalField
-```
-
-**Implementación:**
-- Signal `post_save` en `Product` — compara valores anteriores vs nuevos
-- Solo guarda registro si algún precio cambió (no en cada save)
-- Visible como inline de solo lectura en el admin del producto
-- `changed_by` se captura via middleware o `get_request()` helper
-
-**Criterios de aceptación:**
-- [ ] Cambiar `sale_price` en admin → aparece registro en el inline
-- [ ] Cambiar solo `name` → no genera registro
-- [ ] Inline muestra: fecha, usuario, precios anteriores y nuevos
-- [ ] Tests cubren: cambio de precio, cambio sin precio, primer save
-
----
 
 ### MOP-101 · Clientes y Pedidos
 **Prioridad:** Alta  
