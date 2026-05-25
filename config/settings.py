@@ -175,6 +175,11 @@ UNFOLD = {
                 "collapsible": False,
                 "items": [
                     {
+                        "title": "Pedidos",
+                        "icon": "shopping_bag",
+                        "link": reverse_lazy("admin:catalog_order_changelist"),
+                    },
+                    {
                         "title": "Productos",
                         "icon": "inventory_2",
                         "link": reverse_lazy("admin:catalog_product_changelist"),
@@ -190,14 +195,19 @@ UNFOLD = {
                         "link": reverse_lazy("admin:catalog_purchaseorder_changelist"),
                     },
                     {
-                        "title": "Categorías",
-                        "icon": "category",
-                        "link": reverse_lazy("admin:catalog_category_changelist"),
+                        "title": "Clientes",
+                        "icon": "person",
+                        "link": reverse_lazy("admin:catalog_customer_changelist"),
                     },
                     {
                         "title": "Proveedores",
                         "icon": "local_shipping",
                         "link": reverse_lazy("admin:catalog_supplier_changelist"),
+                    },
+                    {
+                        "title": "Categorías",
+                        "icon": "category",
+                        "link": reverse_lazy("admin:catalog_category_changelist"),
                     },
                 ],
             },

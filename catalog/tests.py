@@ -8,6 +8,8 @@ from django.urls import reverse
 from django.utils import timezone
 
 from catalog.admin import (
+    CustomerAdmin,
+    OrderAdmin,
     PriceHistoryInline,
     ProductAdminForm,
     PurchaseOrderAdmin,
@@ -17,6 +19,9 @@ from config.forms import UsernameOrEmailAuthenticationForm
 
 from .models import (
     Category,
+    Customer,
+    Order,
+    OrderLine,
     PriceHistory,
     Product,
     PurchaseOrder,
@@ -461,6 +466,107 @@ class PurchaseOrderAdminTests(TestCase):
         self.assertEqual(self.product.stock, 5)
         self.assertEqual(PurchaseOrder.objects.count(), 0)
         self.assertEqual(PurchaseOrderLine.objects.count(), 0)
+
+
+class CustomerOrderTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_superuser(
+            username="pedidos",
+            email="pedidos@example.com",
+            password="secret",
+        )
+        self.client.force_login(self.user)
+        self.category = Category.objects.create(name="Pedidos", slug="pedidos")
+        self.supplier = Supplier.objects.create(name="Proveedor pedidos")
+        self.product = Product.objects.create(
+            code="260123",
+            name="Collar inicial",
+            slug="collar-inicial",
+            category=self.category,
+            supplier=self.supplier,
+            cost_price=10000,
+            margin_percent=Decimal("50.00"),
+            sale_price=15000,
+            stock=4,
+            status=Product.Status.ACTIVE,
+        )
+        self.customer = Customer.objects.create(
+            name="Eli Cliente",
+            whatsapp="0981123456",
+            city="Asunción",
+        )
+
+    def test_customer_with_whatsapp_appears_in_admin_list(self):
+        admin_instance = CustomerAdmin(Customer, admin.site)
+
+        self.assertIn("name", admin_instance.list_display)
+        self.assertIn("whatsapp", admin_instance.list_display)
+        self.assertEqual(str(self.customer), "Eli Cliente")
+        self.assertEqual(self.customer.whatsapp, "0981123456")
+
+    def test_order_total_uses_current_product_price_before_confirmation(self):
+        order = Order.objects.create(customer=self.customer, created_by=self.user)
+        OrderLine.objects.create(order=order, product=self.product, quantity=2)
+
+        self.assertEqual(order.total, 30000)
+
+    def test_confirming_order_saves_product_snapshot(self):
+        order = Order.objects.create(customer=self.customer, created_by=self.user)
+        line = OrderLine.objects.create(order=order, product=self.product, quantity=2)
+
+        self.product.name = "Collar editado"
+        self.product.code = "260124"
+        self.product.sale_price = 18000
+        self.product.save()
+
+        order.status = Order.Status.CONFIRMED
+        order.save()
+
+        line.refresh_from_db()
+        self.assertEqual(line.product_name, "Collar editado")
+        self.assertEqual(line.product_code, "260124")
+        self.assertEqual(line.unit_price, 18000)
+        self.assertEqual(order.total, 36000)
+
+        self.product.sale_price = 22000
+        self.product.name = "Collar posterior"
+        self.product.save()
+
+        line.quantity = 3
+        line.save()
+
+        line.refresh_from_db()
+        self.assertEqual(line.product_name, "Collar editado")
+        self.assertEqual(line.unit_price, 18000)
+        self.assertEqual(line.total, 54000)
+
+    def test_customer_detail_shows_order_history_inline(self):
+        order = Order.objects.create(
+            customer=self.customer,
+            status=Order.Status.CONFIRMED,
+            created_by=self.user,
+        )
+        OrderLine.objects.create(order=order, product=self.product, quantity=1)
+        admin_instance = CustomerAdmin(Customer, admin.site)
+        inline = admin_instance.inlines[0](Customer, admin.site)
+
+        self.assertEqual(admin_instance.inlines[0].model, Order)
+        self.assertEqual(inline.total_display(order), "₲ 15.000")
+
+    def test_order_admin_sets_created_by_and_displays_total(self):
+        order = Order(customer=self.customer, status=Order.Status.DRAFT)
+        admin_instance = OrderAdmin(Order, admin.site)
+
+        admin_instance.save_model(
+            request=mock.Mock(user=self.user),
+            obj=order,
+            form=None,
+            change=False,
+        )
+        OrderLine.objects.create(order=order, product=self.product, quantity=3)
+
+        self.assertEqual(order.created_by, self.user)
+        self.assertEqual(admin_instance.total_display(order), "₲ 45.000")
 
 
 class UsernameOrEmailBackendTests(TestCase):

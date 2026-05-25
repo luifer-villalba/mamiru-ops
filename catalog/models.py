@@ -192,6 +192,144 @@ class PriceHistory(models.Model):
         return f"{self.product} - {self.changed_at:%d/%m/%Y %H:%M}"
 
 
+class Customer(models.Model):
+    name = models.CharField("Nombre", max_length=200)
+    whatsapp = models.CharField("WhatsApp", max_length=50, blank=True)
+    city = models.CharField("Ciudad", max_length=100, blank=True)
+    notes = models.TextField("Notas", blank=True)
+    created_at = models.DateTimeField("Creado", auto_now_add=True)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name = "Cliente"
+        verbose_name_plural = "Clientes"
+
+    def __str__(self):
+        return self.name
+
+
+class Order(models.Model):
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Borrador"
+        CONFIRMED = "confirmed", "Confirmado"
+        DELIVERED = "delivered", "Entregado"
+        CANCELLED = "cancelled", "Cancelado"
+
+    customer = models.ForeignKey(
+        Customer,
+        verbose_name="Cliente",
+        on_delete=models.PROTECT,
+        related_name="orders",
+    )
+    date = models.DateField("Fecha", default=timezone.localdate)
+    status = models.CharField(
+        "Estado",
+        max_length=20,
+        choices=Status.choices,
+        default=Status.DRAFT,
+    )
+    notes = models.TextField("Notas", blank=True)
+    created_by = models.ForeignKey(
+        "auth.User",
+        verbose_name="Creado por",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="customer_orders",
+    )
+    created_at = models.DateTimeField("Creado", auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date", "-created_at"]
+        verbose_name = "Pedido"
+        verbose_name_plural = "Pedidos"
+
+    def __str__(self):
+        return f"Pedido #{self.pk} - {self.customer} ({self.date:%d/%m/%Y})"
+
+    @property
+    def total(self):
+        return sum(line.total for line in self.lines.all())
+
+    def confirm_lines(self):
+        for line in self.lines.select_related("product"):
+            line.snapshot_product()
+            line.save(update_fields=["product_name", "product_code", "unit_price"])
+
+    def save(self, *args, **kwargs):
+        was_confirmed = False
+        if self.pk:
+            previous_status = (
+                Order.objects.filter(pk=self.pk)
+                .values_list("status", flat=True)
+                .first()
+            )
+            was_confirmed = previous_status == self.Status.CONFIRMED
+
+        super().save(*args, **kwargs)
+
+        if self.status == self.Status.CONFIRMED and not was_confirmed:
+            self.confirm_lines()
+
+
+class OrderLine(models.Model):
+    order = models.ForeignKey(
+        Order,
+        verbose_name="Pedido",
+        on_delete=models.CASCADE,
+        related_name="lines",
+    )
+    product = models.ForeignKey(
+        Product,
+        verbose_name="Producto",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="order_lines",
+    )
+    product_name = models.CharField("Producto", max_length=300, blank=True)
+    product_code = models.CharField("Código", max_length=50, blank=True)
+    quantity = models.PositiveIntegerField("Cantidad")
+    unit_price = models.PositiveIntegerField("Precio unitario", default=0)
+
+    class Meta:
+        ordering = ["id"]
+        verbose_name = "Línea de pedido"
+        verbose_name_plural = "Líneas de pedido"
+
+    def __str__(self):
+        return f"{self.product_name or self.product} x {self.quantity}"
+
+    @property
+    def effective_unit_price(self):
+        if self.unit_price:
+            return self.unit_price
+        if self.product_id and self.product:
+            return self.product.sale_price
+        return 0
+
+    @property
+    def total(self):
+        return self.quantity * self.effective_unit_price
+
+    def snapshot_product(self):
+        if not self.product:
+            return
+        self.product_name = self.product.name
+        self.product_code = self.product.code
+        self.unit_price = self.product.sale_price
+
+    def save(self, *args, **kwargs):
+        has_snapshot = self.product_name and self.product_code and self.unit_price
+        if (
+            self.order.status == Order.Status.CONFIRMED
+            and self.product
+            and not has_snapshot
+        ):
+            self.snapshot_product()
+        super().save(*args, **kwargs)
+
+
 class PurchaseOrder(models.Model):
     supplier = models.ForeignKey(
         Supplier,
@@ -200,7 +338,9 @@ class PurchaseOrder(models.Model):
         related_name="purchase_orders",
     )
     date = models.DateField("Fecha", default=timezone.localdate)
-    invoice_number = models.CharField("Factura o comprobante nro.", max_length=80, blank=True)
+    invoice_number = models.CharField(
+        "Factura o comprobante nro.", max_length=80, blank=True
+    )
     notes = models.TextField("Notas", blank=True)
     created_by = models.ForeignKey(
         "auth.User",

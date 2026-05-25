@@ -14,6 +14,7 @@ Prefijo de tickets: `MOP-` (Mamiru Ops), arranca en `MOP-100`.
 - API REST de solo lectura (`/api/products/`, `/api/categories/`, `/api/suppliers/`)
 - Órdenes de compra (PurchaseOrder + PurchaseOrderLine) con ajuste de stock automático
 - MOP-100 · Historial de precios con auditoría de cambios en producto
+- MOP-101 · Clientes y Pedidos
 - Login con usuario o email
 - CI con GitHub Actions (tests + ruff)
 - Deploy en Railway con Docker
@@ -27,55 +28,6 @@ _(nada actualmente)_
 ---
 
 ## 📋 Backlog
-
-### MOP-101 · Clientes y Pedidos
-**Prioridad:** Alta  
-**Esfuerzo:** Medio
-
-**Descripción:**  
-Registrar clientes y sus pedidos internamente. No reemplaza la facturación — el operador lleva el pedido a ekuatia'i para facturar.
-
-**Modelos:**
-```
-Customer:
-  name        CharField
-  whatsapp    CharField (opcional)
-  city        CharField (opcional)
-  notes       TextField (opcional)
-  created_at  DateTimeField (auto)
-
-Order:
-  customer    FK → Customer
-  date        DateField
-  status      CharField: borrador / confirmado / entregado / cancelado
-  notes       TextField (opcional)
-  created_by  FK → User
-  created_at  DateTimeField (auto)
-
-OrderLine:
-  order         FK → Order
-  product       FK → Product (nullable, por si se elimina el producto)
-  product_name  CharField (snapshot del nombre al momento)
-  product_code  CharField (snapshot del código)
-  quantity      PositiveIntegerField
-  unit_price    PositiveIntegerField (snapshot del precio al momento)
-```
-
-**Admin:**
-- `CustomerAdmin`: lista con nombre, whatsapp, ciudad + inline de pedidos
-- `OrderAdmin`: lista con cliente, fecha, estado, total calculado
-- `OrderLine` como inline en Order
-- Filtros: por estado, por fecha, por cliente
-- Total del pedido calculado (sum de líneas) visible en lista y detalle
-
-**Criterios de aceptación:**
-- [ ] Crear cliente con whatsapp → aparece en lista
-- [ ] Crear pedido con líneas → total se calcula correctamente
-- [ ] Historial de pedidos visible desde el detalle del cliente
-- [ ] Snapshot de nombre y precio se guarda al confirmar (no cambia si el producto se edita después)
-- [ ] Tests cubren: creación, cálculo de total, snapshot de precios
-
----
 
 ### MOP-102 · Ajuste de Inventario (Conteo Físico)
 **Prioridad:** Alta  

@@ -26,6 +26,9 @@ from catalog.management.commands.import_mamiru_stock import (
 
 from .models import (
     Category,
+    Customer,
+    Order,
+    OrderLine,
     PriceHistory,
     Product,
     ProductImage,
@@ -77,9 +80,7 @@ def parse_optional_pk(value):
 def product_lookup_view(request):
     code = clean_text(request.GET.get("code", ""))
     product = (
-        Product.objects.select_related("category", "supplier")
-        .filter(code=code)
-        .first()
+        Product.objects.select_related("category", "supplier").filter(code=code).first()
     )
     if not product:
         return JsonResponse({"found": False})
@@ -151,7 +152,15 @@ def build_purchase_lines(post_data):
         margin_percent = clean_percent(post_data.get(f"{prefix}margin_percent", ""))
 
         if not any(
-            [code, name, quantity_raw, unit_cost_raw, sale_price_raw, category_id, material]
+            [
+                code,
+                name,
+                quantity_raw,
+                unit_cost_raw,
+                sale_price_raw,
+                category_id,
+                material,
+            ]
         ):
             continue
 
@@ -428,6 +437,47 @@ class CategoryAdmin(ModelAdmin):
     prepopulated_fields = {"slug": ("name",)}
 
 
+class CustomerOrderInline(TabularInline):
+    model = Order
+    extra = 0
+    can_delete = False
+    fields = ["date", "status", "total_display", "created_by", "created_at"]
+    readonly_fields = fields
+    tab = True
+    verbose_name = "Pedido"
+    verbose_name_plural = "Pedidos"
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    @admin.display(description="Total")
+    def total_display(self, obj):
+        return format_guarani(obj.total)
+
+
+@admin.register(Customer)
+class CustomerAdmin(ModelAdmin):
+    list_display = ["name", "whatsapp", "city", "created_at"]
+    search_fields = ["name", "whatsapp", "city"]
+    inlines = [CustomerOrderInline]
+    readonly_fields = ["created_at"]
+    fieldsets = [
+        (
+            "Cliente",
+            {
+                "fields": ["name", "whatsapp", "city", "notes"],
+            },
+        ),
+        (
+            "Auditoría",
+            {
+                "fields": ["created_at"],
+                "classes": ["collapse"],
+            },
+        ),
+    ]
+
+
 class ProductImageInline(TabularInline):
     model = ProductImage
     extra = 1
@@ -582,6 +632,81 @@ class ProductAdmin(ModelAdmin):
         js = ["catalog/js/product_price_format.js"]
 
 
+class OrderLineInline(TabularInline):
+    model = OrderLine
+    extra = 1
+    fields = [
+        "product",
+        "quantity",
+        "product_code",
+        "product_name",
+        "unit_price",
+        "line_total",
+    ]
+    readonly_fields = ["product_code", "product_name", "unit_price", "line_total"]
+    autocomplete_fields = ["product"]
+    tab = True
+
+    @admin.display(description="Total")
+    def line_total(self, obj):
+        return format_guarani(obj.total) if obj and obj.pk else ""
+
+
+@admin.register(Order)
+class OrderAdmin(ModelAdmin):
+    list_display = [
+        "id",
+        "customer",
+        "date",
+        "status",
+        "total_display",
+        "created_by",
+        "created_at",
+    ]
+    list_filter = ["status", "date", "customer"]
+    search_fields = [
+        "customer__name",
+        "customer__whatsapp",
+        "lines__product_name",
+        "lines__product_code",
+        "lines__product__name",
+        "lines__product__code",
+    ]
+    readonly_fields = ["created_by", "created_at", "total_display"]
+    autocomplete_fields = ["customer"]
+    inlines = [OrderLineInline]
+    fieldsets = [
+        (
+            "Pedido",
+            {
+                "fields": ["customer", "date", "status", "notes", "total_display"],
+            },
+        ),
+        (
+            "Auditoría",
+            {
+                "fields": ["created_by", "created_at"],
+                "classes": ["collapse"],
+            },
+        ),
+    ]
+
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        return queryset.select_related("customer", "created_by").prefetch_related(
+            "lines__product"
+        )
+
+    @admin.display(description="Total")
+    def total_display(self, obj):
+        return format_guarani(obj.total)
+
+    def save_model(self, request, obj, form, change):
+        if not obj.created_by_id:
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)
+
+
 @admin.register(PurchaseOrder)
 class PurchaseOrderAdmin(ModelAdmin):
     list_display = [
@@ -638,9 +763,7 @@ class PurchaseOrderAdmin(ModelAdmin):
         if not obj or not obj.pk:
             return "Guardá la compra para ver sus líneas."
 
-        lines = list(
-            obj.lines.select_related("product", "category").order_by("id")
-        )
+        lines = list(obj.lines.select_related("product", "category").order_by("id"))
         if not lines:
             return "Sin líneas."
 
