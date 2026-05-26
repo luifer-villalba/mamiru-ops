@@ -6,7 +6,7 @@ from django.contrib import admin
 from django.contrib.auth import authenticate, get_user_model
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from PIL import Image
@@ -25,6 +25,7 @@ from catalog.admin import (
     validate_product_image_upload,
 )
 from config.forms import UsernameOrEmailAuthenticationForm
+from config.settings import env_bool
 
 from .models import (
     Category,
@@ -87,6 +88,27 @@ class AdminHomeTests(TestCase):
             reverse("admin:catalog_product_changelist"),
             fetch_redirect_response=False,
         )
+
+    @mock.patch.dict("os.environ", {"SERVE_MEDIA_FILES": "TRUE"})
+    def test_env_bool_accepts_uppercase_true(self):
+        self.assertTrue(env_bool("SERVE_MEDIA_FILES"))
+
+    def test_media_route_is_available_when_serving_media_in_production(self):
+        from importlib import reload
+
+        import config.urls
+
+        with override_settings(DEBUG=False, SERVE_MEDIA_FILES=True, MEDIA_URL="/media/"):
+            reloaded_urls = reload(config.urls)
+
+            self.assertTrue(
+                any(
+                    getattr(pattern.pattern, "_regex", "") == r"^media/(?P<path>.*)$"
+                    for pattern in reloaded_urls.urlpatterns
+                )
+            )
+
+        reload(config.urls)
 
 
 class ProductAdminImagePreviewTests(TestCase):

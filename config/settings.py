@@ -8,6 +8,14 @@ from dotenv import load_dotenv
 # Load .env file if present (development only)
 load_dotenv()
 
+
+def env_bool(name, default=False):
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -16,7 +24,7 @@ _INSECURE_KEY = "django-insecure-change-me-in-production"
 SECRET_KEY = os.environ.get("SECRET_KEY", _INSECURE_KEY)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get("DEBUG", "False") == "True"
+DEBUG = env_bool("DEBUG")
 
 if not DEBUG and (not SECRET_KEY or SECRET_KEY == _INSECURE_KEY):
     raise RuntimeError("SECRET_KEY must be set to a secure value when DEBUG is False.")
@@ -135,7 +143,7 @@ STORAGES = {
 # Media files (uploaded images)
 MEDIA_URL = os.environ.get("MEDIA_URL", "/media/")
 MEDIA_ROOT = os.environ.get("MEDIA_ROOT", str(BASE_DIR / "media"))
-SERVE_MEDIA_FILES = os.environ.get("SERVE_MEDIA_FILES", "False") == "True"
+SERVE_MEDIA_FILES = env_bool("SERVE_MEDIA_FILES")
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
