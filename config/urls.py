@@ -18,12 +18,14 @@ urlpatterns = [
     path("", admin.site.urls),
 ]
 
+media_url_path = settings.MEDIA_URL.strip("/")
+
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-elif settings.SERVE_MEDIA_FILES:
+elif settings.SERVE_MEDIA_FILES and media_url_path:
     urlpatterns += [
         re_path(
-            r"^media/(?P<path>.*)$",
+            rf"^{media_url_path}/(?P<path>.*)$",
             serve,
             {"document_root": settings.MEDIA_ROOT},
         )

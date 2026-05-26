@@ -2,6 +2,7 @@ import re
 from decimal import ROUND_CEILING, ROUND_HALF_UP, Decimal
 
 from django import forms
+from django.conf import settings
 from django.contrib import admin, messages
 from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
@@ -187,6 +188,35 @@ def product_search_view(request):
                 }
                 for product in products
             ]
+        }
+    )
+
+
+def media_debug_view(request):
+    path_value = clean_text(request.GET.get("path", ""))
+    storage = ProductImage._meta.get_field("image").storage
+    exists = False
+    url = ""
+    error = ""
+
+    if path_value:
+        try:
+            exists = storage.exists(path_value)
+            if exists:
+                url = storage.url(path_value)
+        except OSError as exc:
+            error = str(exc)
+
+    return JsonResponse(
+        {
+            "path": path_value,
+            "exists": exists,
+            "url": url,
+            "media_root": str(settings.MEDIA_ROOT),
+            "media_url": settings.MEDIA_URL,
+            "serve_media_files": settings.SERVE_MEDIA_FILES,
+            "storage_class": f"{storage.__class__.__module__}.{storage.__class__.__name__}",
+            "error": error,
         }
     )
 
@@ -1002,6 +1032,11 @@ def get_admin_urls():
             "catalog/product/search/",
             admin.site.admin_view(product_search_view),
             name="catalog_product_search",
+        ),
+        path(
+            "catalog/media/debug/",
+            admin.site.admin_view(media_debug_view),
+            name="catalog_media_debug",
         ),
     ]
     return custom_urls + _admin_get_urls()

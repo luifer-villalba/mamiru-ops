@@ -98,12 +98,16 @@ class AdminHomeTests(TestCase):
 
         import config.urls
 
-        with override_settings(DEBUG=False, SERVE_MEDIA_FILES=True, MEDIA_URL="/media/"):
+        with override_settings(
+            DEBUG=False,
+            SERVE_MEDIA_FILES=True,
+            MEDIA_URL="/uploads/",
+        ):
             reloaded_urls = reload(config.urls)
 
             self.assertTrue(
                 any(
-                    getattr(pattern.pattern, "_regex", "") == r"^media/(?P<path>.*)$"
+                    getattr(pattern.pattern, "_regex", "") == r"^uploads/(?P<path>.*)$"
                     for pattern in reloaded_urls.urlpatterns
                 )
             )
@@ -556,6 +560,21 @@ class PurchaseOrderAdminTests(TestCase):
                 "margin_percent": "40.00",
             },
         )
+        storage_exists.assert_called_once_with("products/purchase.jpg")
+
+    @mock.patch("django.core.files.storage.FileSystemStorage.exists", return_value=True)
+    def test_media_debug_reports_storage_status(self, storage_exists):
+        response = self.client.get(
+            reverse("admin:catalog_media_debug"),
+            {"path": "products/purchase.jpg"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["path"], "products/purchase.jpg")
+        self.assertTrue(data["exists"])
+        self.assertEqual(data["url"], "/media/products/purchase.jpg")
+        self.assertIn("FileSystemStorage", data["storage_class"])
         storage_exists.assert_called_once_with("products/purchase.jpg")
 
     @mock.patch("django.core.files.storage.FileSystemStorage.exists", return_value=True)
