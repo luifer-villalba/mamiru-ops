@@ -38,11 +38,44 @@ from .models import (
 )
 from .price_history import price_history_user
 
+PRODUCT_IMAGE_ALLOWED_TYPES = {
+    "image/jpeg": "JPEG",
+    "image/png": "PNG",
+    "image/webp": "WebP",
+}
+PRODUCT_IMAGE_MAX_SIZE = 5 * 1024 * 1024
+
 
 def format_guarani(value):
     if value in (None, ""):
         return ""
     return f"₲ {int(value):,}".replace(",", ".")
+
+
+def main_image_url(product):
+    images = list(product.images.all())
+    image = next((image for image in images if image.is_main), None)
+    if image is None:
+        image = next(iter(images), None)
+
+    if not image or not image.image:
+        return ""
+
+    return image.image.url
+
+
+def validate_product_image_upload(image):
+    if not image:
+        return
+
+    content_type = getattr(image, "content_type", "")
+    if content_type and content_type not in PRODUCT_IMAGE_ALLOWED_TYPES:
+        allowed = ", ".join(PRODUCT_IMAGE_ALLOWED_TYPES.values())
+        raise ValidationError(f"La imagen debe ser {allowed}.")
+
+    size = getattr(image, "size", 0) or 0
+    if size > PRODUCT_IMAGE_MAX_SIZE:
+        raise ValidationError("La imagen no puede superar 5 MB.")
 
 
 def round_up_to_hundred(value):
@@ -80,7 +113,10 @@ def parse_optional_pk(value):
 def product_lookup_view(request):
     code = clean_text(request.GET.get("code", ""))
     product = (
-        Product.objects.select_related("category", "supplier").filter(code=code).first()
+        Product.objects.select_related("category", "supplier")
+        .prefetch_related("images")
+        .filter(code=code)
+        .first()
     )
     if not product:
         return JsonResponse({"found": False})
@@ -95,6 +131,7 @@ def product_lookup_view(request):
             "cost_price": product.cost_price,
             "sale_price": product.sale_price,
             "stock": product.stock,
+            "thumbnail_url": main_image_url(product),
             "margin_percent": (
                 str(product.margin_percent)
                 if product.margin_percent is not None
@@ -106,7 +143,9 @@ def product_lookup_view(request):
 
 def product_search_view(request):
     query = clean_text(request.GET.get("q", ""))
-    products = Product.objects.select_related("category", "supplier")
+    products = Product.objects.select_related("category", "supplier").prefetch_related(
+        "images"
+    )
     if query:
         products = products.filter(Q(code__icontains=query) | Q(name__icontains=query))
     products = products.order_by("code", "name")[:12]
@@ -123,6 +162,7 @@ def product_search_view(request):
                     "cost_price": product.cost_price,
                     "sale_price": product.sale_price,
                     "stock": product.stock,
+                    "thumbnail_url": main_image_url(product),
                     "margin_percent": (
                         str(product.margin_percent)
                         if product.margin_percent is not None
@@ -478,11 +518,41 @@ class CustomerAdmin(ModelAdmin):
     ]
 
 
+class ProductImageAdminForm(forms.ModelForm):
+    class Meta:
+        model = ProductImage
+        fields = "__all__"
+        widgets = {
+            "image": forms.ClearableFileInput(
+                attrs={"accept": "image/jpeg,image/png,image/webp"}
+            )
+        }
+
+    def clean_image(self):
+        image = self.cleaned_data.get("image")
+        validate_product_image_upload(image)
+        return image
+
+
 class ProductImageInline(TabularInline):
     model = ProductImage
+    form = ProductImageAdminForm
     extra = 1
-    fields = ["image", "is_main", "sort_order"]
+    fields = ["preview", "image", "is_main", "sort_order"]
+    readonly_fields = ["preview"]
     tab = True
+
+    @admin.display(description="Vista previa")
+    def preview(self, obj):
+        if not obj or not obj.image:
+            return "Sin imagen"
+
+        return format_html(
+            '<img src="{}" alt="{}" style="width: 72px; height: 72px; '
+            'object-fit: cover; border-radius: 6px;" />',
+            obj.image.url,
+            obj.product.name,
+        )
 
 
 class PriceHistoryInline(TabularInline):
@@ -533,6 +603,7 @@ class StockLevelFilter(admin.SimpleListFilter):
 class ProductAdmin(ModelAdmin):
     form = ProductAdminForm
     list_display = [
+        "thumbnail",
         "code",
         "name",
         "stock",
@@ -595,7 +666,22 @@ class ProductAdmin(ModelAdmin):
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
-        return queryset.select_related("category", "supplier")
+        return queryset.select_related("category", "supplier").prefetch_related(
+            "images"
+        )
+
+    @admin.display(description="Foto")
+    def thumbnail(self, obj):
+        image_url = main_image_url(obj)
+        if not image_url:
+            return "Sin foto"
+
+        return format_html(
+            '<img src="{}" alt="{}" style="width: 48px; height: 48px; '
+            'object-fit: cover; border-radius: 6px;" />',
+            image_url,
+            obj.name,
+        )
 
     def save_model(self, request, obj, form, change):
         with price_history_user(request.user):
@@ -629,7 +715,10 @@ class ProductAdmin(ModelAdmin):
         )
 
     class Media:
-        js = ["catalog/js/product_price_format.js"]
+        js = [
+            "catalog/js/product_price_format.js",
+            "catalog/js/product_image_preview.js",
+        ]
 
 
 class OrderLineInline(TabularInline):

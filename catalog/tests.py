@@ -1,19 +1,27 @@
 from decimal import Decimal
+from io import BytesIO
 from unittest import mock
 
 from django.contrib import admin
 from django.contrib.auth import authenticate, get_user_model
+from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
+from PIL import Image
 
 from catalog.admin import (
     CustomerAdmin,
     OrderAdmin,
     PriceHistoryInline,
+    ProductAdmin,
     ProductAdminForm,
+    ProductImageAdminForm,
+    ProductImageInline,
     PurchaseOrderAdmin,
     build_purchase_lines,
+    validate_product_image_upload,
 )
 from config.forms import UsernameOrEmailAuthenticationForm
 
@@ -24,6 +32,7 @@ from .models import (
     OrderLine,
     PriceHistory,
     Product,
+    ProductImage,
     PurchaseOrder,
     PurchaseOrderLine,
     Supplier,
@@ -78,6 +87,118 @@ class AdminHomeTests(TestCase):
             fetch_redirect_response=False,
         )
 
+
+class ProductAdminImagePreviewTests(TestCase):
+    def setUp(self):
+        self.category = Category.objects.create(name="Fotos", slug="fotos")
+        self.supplier = Supplier.objects.create(name="Proveedor fotos")
+        self.product = Product.objects.create(
+            name="Producto con foto",
+            slug="producto-con-foto",
+            category=self.category,
+            supplier=self.supplier,
+        )
+
+    def test_thumbnail_uses_main_image(self):
+        ProductImage.objects.create(
+            product=self.product,
+            image="products/secondary.jpg",
+            sort_order=1,
+        )
+        ProductImage.objects.create(
+            product=self.product,
+            image="products/main.jpg",
+            is_main=True,
+            sort_order=2,
+        )
+        product_admin = ProductAdmin(Product, admin.site)
+        product = Product.objects.prefetch_related("images").get(pk=self.product.pk)
+
+        thumbnail = str(product_admin.thumbnail(product))
+
+        self.assertIn("/media/products/main.jpg", thumbnail)
+        self.assertIn("Producto con foto", thumbnail)
+
+    def test_inline_preview_renders_uploaded_image(self):
+        product_image = ProductImage.objects.create(
+            product=self.product,
+            image="products/preview.jpg",
+        )
+        inline = ProductImageInline(Product, admin.site)
+
+        preview = str(inline.preview(product_image))
+
+        self.assertIn("/media/products/preview.jpg", preview)
+        self.assertIn("Producto con foto", preview)
+
+    def test_product_image_save_keeps_only_one_main_image(self):
+        first_image = ProductImage.objects.create(
+            product=self.product,
+            image="products/first.jpg",
+            is_main=True,
+        )
+        second_image = ProductImage.objects.create(
+            product=self.product,
+            image="products/second.jpg",
+            is_main=True,
+        )
+
+        first_image.refresh_from_db()
+        second_image.refresh_from_db()
+
+        self.assertFalse(first_image.is_main)
+        self.assertTrue(second_image.is_main)
+
+    def test_image_form_accepts_expected_formats(self):
+        buffer = BytesIO()
+        Image.new("RGB", (1, 1), color="white").save(buffer, format="PNG")
+        upload = SimpleUploadedFile(
+            "foto.png",
+            buffer.getvalue(),
+            content_type="image/png",
+        )
+        form = ProductImageAdminForm(
+            data={
+                "product": self.product.pk,
+                "is_main": "",
+                "sort_order": "0",
+            },
+            files={"image": upload},
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_image_form_rejects_unsupported_formats(self):
+        upload = SimpleUploadedFile(
+            "foto.gif",
+            b"GIF87a\x01\x00\x01\x00\x80\x01\x00\x00\x00\x00\xff\xff\xff,"
+            b"\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;",
+            content_type="image/gif",
+        )
+        form = ProductImageAdminForm(
+            data={
+                "product": self.product.pk,
+                "is_main": "",
+                "sort_order": "0",
+            },
+            files={"image": upload},
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("La imagen debe ser JPEG, PNG, WebP.", form.errors["image"])
+
+    def test_image_validation_rejects_large_files(self):
+        image = mock.Mock(content_type="image/png", size=(5 * 1024 * 1024) + 1)
+
+        with self.assertRaisesMessage(ValidationError, "La imagen no puede superar"):
+            validate_product_image_upload(image)
+
+    def test_product_admin_loads_live_preview_script(self):
+        self.assertIn(
+            "catalog/js/product_image_preview.js",
+            ProductAdmin.Media.js,
+        )
+
     def test_product_admin_uses_pagination(self):
         from catalog.admin import ProductAdmin
 
@@ -89,6 +210,7 @@ class AdminHomeTests(TestCase):
         self.assertEqual(
             ProductAdmin.list_display,
             [
+                "thumbnail",
                 "code",
                 "name",
                 "stock",
@@ -280,6 +402,11 @@ class PurchaseOrderAdminTests(TestCase):
             stock=5,
             status=Product.Status.ACTIVE,
         )
+        ProductImage.objects.create(
+            product=self.product,
+            image="products/purchase.jpg",
+            is_main=True,
+        )
 
     def purchase_payload(self, **overrides):
         data = {
@@ -324,6 +451,7 @@ class PurchaseOrderAdminTests(TestCase):
                 "cost_price": 10000,
                 "sale_price": 14000,
                 "stock": 5,
+                "thumbnail_url": "/media/products/purchase.jpg",
                 "margin_percent": "40.00",
             },
         )
@@ -346,6 +474,7 @@ class PurchaseOrderAdminTests(TestCase):
                 "cost_price": 10000,
                 "sale_price": 14000,
                 "stock": 5,
+                "thumbnail_url": "/media/products/purchase.jpg",
                 "margin_percent": "40.00",
             },
         )

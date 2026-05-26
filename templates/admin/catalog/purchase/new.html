@@ -359,13 +359,14 @@
   }
 
   .purchase-search-result {
+    align-items: center;
     background: #ffffff;
     border: 0;
     border-bottom: 1px solid #e5e7eb;
     color: #111827;
     cursor: pointer;
     display: flex;
-    gap: 4px;
+    gap: 10px;
     justify-content: space-between;
     padding: 10px 12px;
     text-align: left;
@@ -385,8 +386,19 @@
 
   .purchase-search-copy {
     display: grid;
+    flex: 1 1 auto;
     gap: 4px;
     min-width: 0;
+  }
+
+  .purchase-search-thumb {
+    background: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    flex: 0 0 44px;
+    height: 44px;
+    object-fit: cover;
+    width: 44px;
   }
 
   .purchase-search-meta {
@@ -755,6 +767,7 @@
       searchResults.replaceChildren();
       products.forEach((product, index) => {
         const button = document.createElement("button");
+        const thumb = document.createElement("img");
         const copy = document.createElement("span");
         const main = document.createElement("span");
         const meta = document.createElement("span");
@@ -763,6 +776,11 @@
         button.className = "purchase-search-result";
         button.type = "button";
         button.dataset.index = String(index);
+        thumb.className = "purchase-search-thumb";
+        thumb.alt = product.name;
+        if (product.thumbnail_url) {
+          thumb.src = product.thumbnail_url;
+        }
         copy.className = "purchase-search-copy";
         main.className = "purchase-search-main";
         main.textContent = `${product.code} · ${product.name}`;
@@ -775,6 +793,9 @@
           <span>Precio ${formatGuarani(product.sale_price || 0)}</span>
         `;
         copy.append(main, meta);
+        if (product.thumbnail_url) {
+          button.append(thumb);
+        }
         button.append(copy, stats);
         searchResults.appendChild(button);
       });

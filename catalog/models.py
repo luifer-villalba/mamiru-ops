@@ -147,6 +147,13 @@ class ProductImage(models.Model):
     def __str__(self):
         return f"Imagen de {self.product.name} ({self.id})"
 
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if self.is_main:
+            ProductImage.objects.filter(product=self.product, is_main=True).exclude(
+                pk=self.pk
+            ).update(is_main=False)
+
 
 class PriceHistory(models.Model):
     product = models.ForeignKey(
