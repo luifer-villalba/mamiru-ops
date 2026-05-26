@@ -1,5 +1,6 @@
 from decimal import Decimal
 from io import BytesIO
+from pathlib import Path
 from unittest import mock
 from xml.etree import ElementTree
 
@@ -379,6 +380,14 @@ class ProductAdminImagePreviewTests(TestCase):
             ProductAdmin.Media.js,
         )
 
+    def test_product_change_form_includes_preview_layout_styles(self):
+        template = Path("templates/admin/catalog/product/change_form.html").read_text()
+
+        self.assertIn(
+            "product-identification-preview-layout",
+            template,
+        )
+
     def test_product_admin_loads_clickable_rows_script(self):
         self.assertIn(
             "catalog/js/admin_clickable_rows.js",
@@ -423,12 +432,21 @@ class ProductAdminImagePreviewTests(TestCase):
         from catalog.admin import ProductAdmin
 
         identification_fields = ProductAdmin.fieldsets[0][1]["fields"]
+        identification_classes = ProductAdmin.fieldsets[0][1]["classes"]
         web_fields = ProductAdmin.fieldsets[3][1]["fields"]
         detail_fields = ProductAdmin.fieldsets[4][1]["fields"]
         care_fields = ProductAdmin.fieldsets[5][1]["fields"]
         seo_fields = ProductAdmin.fieldsets[7][1]["fields"]
 
-        self.assertIn(("code", "product_form_image_preview"), identification_fields)
+        self.assertIn("code", identification_fields)
+        self.assertIn("product_form_image_preview", identification_fields)
+        self.assertNotIn(("code", "product_form_image_preview"), identification_fields)
+        self.assertEqual(identification_fields[0], "code")
+        self.assertEqual(identification_fields[-1], "product_form_image_preview")
+        self.assertIn(
+            "product-identification-preview-layout",
+            identification_classes,
+        )
         self.assertIn("visible_on_web", web_fields)
         self.assertIn("short_description", web_fields)
         self.assertIn("detailed_material", detail_fields)

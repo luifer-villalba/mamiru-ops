@@ -1,11 +1,21 @@
 SHELL := /bin/sh
 
 COMPOSE ?= docker compose
-PYTHON ?= python
+PYTHON ?= python3
+VENV ?= .venv
+VENV_PYTHON ?= $(VENV)/bin/python
+VENV_STAMP ?= $(VENV)/.installed
 MANAGE ?= $(PYTHON) manage.py
+LOCAL_MANAGE ?= $(VENV_PYTHON) manage.py
+LOCAL_RUFF ?= $(VENV)/bin/ruff
+LOCAL_PYTEST ?= $(VENV)/bin/pytest
 SERVICE ?= web
 SEED_FILE ?= data/stock.csv
 DB_VOLUME ?= mamiru-ops_postgres_data
+RUNSERVER_ADDR ?= 127.0.0.1:8000
+SQLITE_DATABASE_URL ?= sqlite:////tmp/mamiru-ops-dev.sqlite3
+LOCAL_DATABASE_URL ?= postgres://mamiru:mamiru@127.0.0.1:5432/mamiru
+LOCAL_STATIC_ROOT ?= /tmp/mamiru-ops-staticfiles
 APP_URL ?= http://localhost:8000
 ADMIN_URL ?= $(APP_URL)/
 PRODUCTS_ADMIN_URL ?= $(APP_URL)/admin/catalog/product/
@@ -15,7 +25,7 @@ API_PRODUCTS_URL ?= $(APP_URL)/api/products/
 
 .DEFAULT_GOAL := help
 
-.PHONY: help links env build up down restart logs ps check shell bash migrate makemigrations superuser test collectstatic import seed reset-db local-run local-migrate local-makemigrations local-superuser local-test local-shell lint format lint-fix pytest pytest-cov
+.PHONY: help links env build up down restart logs ps check shell bash migrate makemigrations superuser test collectstatic import seed reset-db venv runserver sqlite-runserver local-run local-migrate local-makemigrations local-superuser local-test local-shell lint format lint-fix pytest pytest-cov
 
 help: ## Mostrar comandos disponibles
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUso: make <comando>\n\nComandos:\n"} /^[a-zA-Z0-9_-]+:.*##/ {printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -131,58 +141,82 @@ reset-db: ## Resetear la base local de Docker sin borrar media
 	@echo "Siguiente paso habitual: make migrate && make seed && make superuser"
 	@echo "Admin: $(ADMIN_URL)"
 
-local-run: env ## Levantar servidor de desarrollo local
-	@echo "Levantando servidor de desarrollo local..."
-	@echo "  Admin:         $(ADMIN_URL)"
-	@echo "  API:           $(API_URL)"
-	$(MANAGE) runserver
+$(VENV_STAMP): requirements.txt
+	@echo "Creando entorno virtual local en $(VENV)..."
+	$(PYTHON) -m venv $(VENV)
+	$(VENV_PYTHON) -m pip install -r requirements.txt
+	@touch $(VENV_STAMP)
 
-local-migrate: env ## Ejecutar migraciones localmente
+venv: $(VENV_STAMP) ## Crear entorno virtual local e instalar dependencias
+	@echo "Entorno virtual listo: $(VENV)"
+
+runserver: env venv ## Levantar servidor local usando Postgres de make up
+	@echo "Levantando servidor local con Django..."
+	@echo "  Dirección:     http://$(RUNSERVER_ADDR)/"
+	@echo "  Base de datos: $(LOCAL_DATABASE_URL)"
+	@echo "Aplicando migraciones en Postgres local..."
+	DATABASE_URL=$(LOCAL_DATABASE_URL) $(LOCAL_MANAGE) migrate --noinput
+	@echo "Preparando archivos estáticos locales..."
+	DATABASE_URL=$(LOCAL_DATABASE_URL) STATIC_ROOT=$(LOCAL_STATIC_ROOT) $(LOCAL_MANAGE) collectstatic --noinput
+	DATABASE_URL=$(LOCAL_DATABASE_URL) STATIC_ROOT=$(LOCAL_STATIC_ROOT) $(LOCAL_MANAGE) runserver $(RUNSERVER_ADDR)
+
+sqlite-runserver: env venv ## Levantar servidor local con SQLite temporal
+	@echo "Levantando servidor local con Django y SQLite temporal..."
+	@echo "  Dirección:     http://$(RUNSERVER_ADDR)/"
+	@echo "Aplicando migraciones en SQLite temporal..."
+	DATABASE_URL=$(SQLITE_DATABASE_URL) $(LOCAL_MANAGE) migrate --noinput
+	@echo "Preparando archivos estáticos locales..."
+	DATABASE_URL=$(SQLITE_DATABASE_URL) STATIC_ROOT=$(LOCAL_STATIC_ROOT) $(LOCAL_MANAGE) collectstatic --noinput
+	DATABASE_URL=$(SQLITE_DATABASE_URL) STATIC_ROOT=$(LOCAL_STATIC_ROOT) $(LOCAL_MANAGE) runserver $(RUNSERVER_ADDR)
+
+local-run: env venv ## Levantar servidor local respetando DATABASE_URL de .env
+	@echo "Levantando servidor de desarrollo local..."
+	@echo "  Dirección:     http://$(RUNSERVER_ADDR)/"
+	$(LOCAL_MANAGE) runserver $(RUNSERVER_ADDR)
+
+local-migrate: env venv ## Ejecutar migraciones localmente
 	@echo "Ejecutando migraciones localmente..."
-	$(MANAGE) migrate
+	$(LOCAL_MANAGE) migrate
 	@echo "Migraciones locales aplicadas. Admin: $(ADMIN_URL)"
 
-local-makemigrations: env ## Crear migraciones localmente
+local-makemigrations: env venv ## Crear migraciones localmente
 	@echo "Creando migraciones localmente..."
-	$(MANAGE) makemigrations
+	$(LOCAL_MANAGE) makemigrations
 	@echo "Migraciones locales creadas. Revisalas con: git diff catalog/migrations"
 
-local-superuser: env ## Crear superusuario localmente
+local-superuser: env venv ## Crear superusuario localmente
 	@echo "Creando superusuario localmente..."
-	$(MANAGE) createsuperuser
+	$(LOCAL_MANAGE) createsuperuser
 	@echo "Cuando termines, entra al admin: $(ADMIN_URL)"
 
-local-test: env ## Ejecutar tests localmente
+local-test: venv ## Ejecutar tests localmente con SQLite temporal
 	@echo "Ejecutando tests localmente..."
-	$(MANAGE) test
+	DATABASE_URL=$(SQLITE_DATABASE_URL) $(LOCAL_MANAGE) test
 	@echo "Tests locales OK."
 
-local-shell: env ## Abrir shell de Django localmente
+local-shell: env venv ## Abrir shell de Django localmente
 	@echo "Abriendo shell de Django localmente..."
 	@echo "Modelo util: from catalog.models import Product, PurchaseOrder"
-	$(MANAGE) shell
+	$(LOCAL_MANAGE) shell
 
-lint: ## Ejecutar ruff check localmente
+lint: venv ## Ejecutar ruff check localmente
 	@echo "Ejecutando ruff check..."
-	ruff check .
+	$(LOCAL_RUFF) check . --no-cache
 	@echo "Ruff check OK."
 
-format: ## Ejecutar ruff format localmente
+format: venv ## Ejecutar ruff format localmente
 	@echo "Ejecutando ruff format..."
-	ruff format .
+	$(LOCAL_RUFF) format .
 	@echo "Formato aplicado."
 
-lint-fix: ## Ejecutar ruff check con autofix localmente
+lint-fix: venv ## Ejecutar ruff check con autofix localmente
 	@echo "Ejecutando ruff check --fix..."
-	ruff check . --fix
+	$(LOCAL_RUFF) check . --fix --no-cache
 	@echo "Autofix aplicado. Revisa el diff antes de commitear."
 
-pytest: ## Ejecutar tests con pytest localmente
+pytest: venv ## Ejecutar tests con pytest localmente
 	@echo "Ejecutando pytest..."
-	pytest
+	DATABASE_URL=$(SQLITE_DATABASE_URL) $(LOCAL_PYTEST)
 	@echo "Pytest OK."
 
-pytest-cov: ## Ejecutar pytest con coverage localmente
-	@echo "Ejecutando pytest con coverage..."
-	pytest --cov=catalog --cov-report=term-missing
-	@echo "Coverage listo."
+pytest-cov: pytest ## Alias de pytest, que ya corre coverage por pyproject.toml

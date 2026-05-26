@@ -693,12 +693,14 @@ class ProductAdmin(ModelAdmin):
             "Identificación",
             {
                 "fields": [
-                    ("code", "product_form_image_preview"),
+                    "code",
                     "name",
                     "slug",
                     "status",
+                    "product_form_image_preview",
                 ],
                 "description": "El código se genera automáticamente al guardar.",
+                "classes": ["product-identification-preview-layout"],
             },
         ),
         (

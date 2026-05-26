@@ -2,6 +2,78 @@
 
 {% block extrahead %}
     {{ block.super }}
+    <style>
+        @media (min-width: 1024px) {
+            #content-main form fieldset.product-identification-preview-layout > .form-rows {
+                align-items: start;
+                column-gap: 1.5rem;
+                display: grid !important;
+                grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
+                overflow: visible;
+            }
+
+            #content-main form fieldset.product-identification-preview-layout > .form-rows > .form-row {
+                grid-column: 1;
+                max-width: none !important;
+                min-width: 0;
+            }
+
+            #content-main form fieldset.product-identification-preview-layout > .form-rows > .form-row:last-child {
+                align-self: stretch;
+                border-left: 1px solid #e5e7eb;
+                grid-column: 2;
+                grid-row: 1 / span 4;
+                max-width: none !important;
+                padding-left: 1.5rem;
+                width: 100%;
+            }
+
+            #content-main form fieldset.product-identification-preview-layout > .form-rows > .form-row:last-child > .field-line {
+                align-items: center !important;
+                border-bottom: 0 !important;
+                border-left: 0 !important;
+                flex-direction: column !important;
+                height: 100%;
+                justify-content: center;
+                min-height: 0 !important;
+                padding: 0 !important;
+            }
+
+            #content-main form fieldset.product-identification-preview-layout > .form-rows > .form-row:last-child > .field-line > div:first-child {
+                display: none !important;
+            }
+
+            #content-main form fieldset.product-identification-preview-layout > .form-rows > .form-row:last-child > .field-line > div:last-child {
+                align-items: center;
+                display: flex;
+                justify-content: center;
+                width: 100%;
+            }
+
+            #content-main form fieldset.product-identification-preview-layout > .form-rows > .form-row:last-child .readonly {
+                align-items: center;
+                display: flex;
+                justify-content: center;
+                margin: 0;
+                max-width: none;
+                padding: 0;
+                width: 100%;
+            }
+
+            [data-product-form-image-preview] {
+                display: flex;
+                justify-content: center;
+                width: min(100%, 220px) !important;
+            }
+
+            [data-product-form-image-preview] img,
+            [data-product-form-image-placeholder] {
+                height: 220px !important;
+                max-width: 100%;
+                width: 220px !important;
+            }
+        }
+    </style>
     {% if original %}
         <meta name="description" content="{{ original.meta_description }}">
         <meta property="og:site_name" content="Mamiru Ops">
