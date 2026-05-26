@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="es">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>{{ meta_title }}</title>
+        <meta name="description" content="{{ meta_description }}">
+        <link rel="canonical" href="{{ canonical_url }}">
+        <meta property="og:site_name" content="Mamiru">
+        <meta property="og:type" content="product">
+        <meta property="og:title" content="{{ meta_title }}">
+        <meta property="og:description" content="{{ meta_description }}">
+        <meta property="og:url" content="{{ canonical_url }}">
+        {% if image_url %}<meta property="og:image" content="{{ image_url }}">{% endif %}
+        <meta name="twitter:card" content="{% if image_url %}summary_large_image{% else %}summary{% endif %}">
+        <meta name="twitter:title" content="{{ meta_title }}">
+        <meta name="twitter:description" content="{{ meta_description }}">
+        {% if image_url %}<meta name="twitter:image" content="{{ image_url }}">{% endif %}
+    </head>
+    <body>
+        <main>
+            <h1>{{ product.name }}</h1>
+            <p>{{ meta_description }}</p>
+        </main>
+    </body>
+</html>

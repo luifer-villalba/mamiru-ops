@@ -1,0 +1,16 @@
+{% extends "admin/change_form.html" %}
+
+{% block extrahead %}
+    {{ block.super }}
+    {% if original %}
+        <meta name="description" content="{{ original.meta_description }}">
+        <meta property="og:site_name" content="Mamiru Ops">
+        <meta property="og:type" content="product">
+        <meta property="og:title" content="{{ original.meta_title }}">
+        <meta property="og:description" content="{{ original.meta_description }}">
+        <meta property="og:url" content="{{ request.build_absolute_uri }}">
+        <meta name="twitter:card" content="summary">
+        <meta name="twitter:title" content="{{ original.meta_title }}">
+        <meta name="twitter:description" content="{{ original.meta_description }}">
+    {% endif %}
+{% endblock %}

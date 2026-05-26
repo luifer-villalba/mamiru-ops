@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from django.utils.text import slugify
@@ -30,6 +31,9 @@ class Category(models.Model):
 
     def __str__(self):
         return self.name
+
+    def get_absolute_url(self):
+        return settings.PUBLIC_CATEGORY_PATH_PATTERN.format(slug=self.slug)
 
     def save(self, *args, **kwargs):
         if not self.slug:
@@ -120,6 +124,25 @@ class Product(models.Model):
 
     def __str__(self):
         return f"[{self.code}] {self.name}"
+
+    @property
+    def meta_title(self) -> str:
+        return self.seo_title or f"{self.name} | Mamiru"
+
+    @property
+    def meta_description(self) -> str:
+        description = (
+            self.seo_description
+            or self.short_description
+            or self.description
+            or f"{self.name} en Mamiru."
+        )
+        if len(description) <= 160:
+            return description
+        return f"{description[:157].rstrip()}..."
+
+    def get_absolute_url(self):
+        return settings.PUBLIC_PRODUCT_PATH_PATTERN.format(slug=self.slug)
 
     @classmethod
     def generate_code(cls) -> str:

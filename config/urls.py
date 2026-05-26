@@ -6,6 +6,13 @@ from django.urls import include, path, re_path, reverse_lazy
 from django.views.generic import RedirectView
 from django.views.static import serve
 
+from catalog.views import (
+    category_meta_preview,
+    product_meta_preview,
+    robots_txt,
+    sitemap_xml,
+)
+
 
 def healthz(_request):
     return JsonResponse({"status": "ok"})
@@ -27,6 +34,14 @@ elif settings.SERVE_MEDIA_FILES and media_url_path:
 
 urlpatterns = [
     path("healthz/", healthz),
+    path("robots.txt", robots_txt, name="robots_txt"),
+    path("sitemap.xml", sitemap_xml, name="sitemap_xml"),
+    path("productos/<slug:slug>/", product_meta_preview, name="product_meta_preview"),
+    path(
+        "categorias/<slug:slug>/",
+        category_meta_preview,
+        name="category_meta_preview",
+    ),
     path("admin/", RedirectView.as_view(url=reverse_lazy("admin:index"), permanent=True)),
     path("api/", include("catalog.urls")),
     *media_urlpatterns,

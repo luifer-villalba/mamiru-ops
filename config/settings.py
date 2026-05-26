@@ -145,6 +145,16 @@ MEDIA_URL = os.environ.get("MEDIA_URL", "/media/")
 MEDIA_ROOT = os.environ.get("MEDIA_ROOT", str(BASE_DIR / "media"))
 SERVE_MEDIA_FILES = env_bool("SERVE_MEDIA_FILES")
 
+# Public SEO URLs. Set PUBLIC_SITE_URL when the catalog frontend lives on a
+# different domain from this Django app.
+PUBLIC_SITE_URL = os.environ.get("PUBLIC_SITE_URL", "").rstrip("/")
+PUBLIC_PRODUCT_PATH_PATTERN = os.environ.get(
+    "PUBLIC_PRODUCT_PATH_PATTERN", "/productos/{slug}/"
+)
+PUBLIC_CATEGORY_PATH_PATTERN = os.environ.get(
+    "PUBLIC_CATEGORY_PATH_PATTERN", "/categorias/{slug}/"
+)
+
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

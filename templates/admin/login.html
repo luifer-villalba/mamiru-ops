@@ -7,6 +7,11 @@
     {{ form.media }}
 {% endblock %}
 
+{% block extrahead %}
+    {{ block.super }}
+    {% include "admin/includes/ops_metadata.html" %}
+{% endblock %}
+
 {% block title %}
     {{ title }} | {{ site_title }}
 {% endblock %}

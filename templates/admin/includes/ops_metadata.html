@@ -1,0 +1,11 @@
+{% with ops_title="Mamiru Ops" ops_description="Panel interno de operaciones de Mamiru para gestionar catálogo, proveedores, stock, precios, imágenes y pedidos." %}
+    <meta name="description" content="{{ ops_description }}">
+    <meta property="og:site_name" content="Mamiru Ops">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="{{ ops_title }}">
+    <meta property="og:description" content="{{ ops_description }}">
+    <meta property="og:url" content="{{ request.build_absolute_uri }}">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="{{ ops_title }}">
+    <meta name="twitter:description" content="{{ ops_description }}">
+{% endwith %}

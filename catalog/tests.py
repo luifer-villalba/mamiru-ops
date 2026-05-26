@@ -1,6 +1,7 @@
 from decimal import Decimal
 from io import BytesIO
 from unittest import mock
+from xml.etree import ElementTree
 
 from django.contrib import admin
 from django.contrib.auth import authenticate, get_user_model
@@ -94,6 +95,28 @@ class AdminHomeTests(TestCase):
     @mock.patch.dict("os.environ", {"SERVE_MEDIA_FILES": "TRUE"})
     def test_env_bool_accepts_uppercase_true(self):
         self.assertTrue(env_bool("SERVE_MEDIA_FILES"))
+
+    @override_settings(
+        STORAGES={
+            "default": {
+                "BACKEND": "django.core.files.storage.FileSystemStorage",
+            },
+            "staticfiles": {
+                "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+            },
+        }
+    )
+    def test_admin_login_includes_ops_metadata(self):
+        response = self.client.get(reverse("admin:login"))
+
+        self.assertContains(response, '<meta name="description"', html=False)
+        self.assertContains(response, 'content="Mamiru Ops"', html=False)
+        self.assertContains(
+            response,
+            "Panel interno de operaciones de Mamiru",
+            html=False,
+        )
+        self.assertContains(response, '<meta property="og:title"', html=False)
 
     def test_media_route_is_available_when_serving_media_in_production(self):
         from importlib import reload
@@ -356,6 +379,44 @@ class ProductAdminImagePreviewTests(TestCase):
         self.assertIn("is_water_resistant", care_fields)
         self.assertIn("seo_title", seo_fields)
 
+    @override_settings(
+        STORAGES={
+            "default": {
+                "BACKEND": "django.core.files.storage.FileSystemStorage",
+            },
+            "staticfiles": {
+                "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+            },
+        }
+    )
+    def test_product_change_page_includes_product_metadata(self):
+        user = get_user_model().objects.create_superuser(
+            username="metadata",
+            email="metadata@example.com",
+            password="secret",
+        )
+        self.client.force_login(user)
+        self.product.seo_title = "Aro admin Mamiru Ops"
+        self.product.seo_description = (
+            "Metadata específica para la ficha interna del producto."
+        )
+        self.product.save()
+
+        response = self.client.get(
+            reverse("admin:catalog_product_change", args=[self.product.pk])
+        )
+
+        self.assertContains(response, "Aro admin Mamiru Ops")
+        self.assertContains(
+            response,
+            '<meta property="og:type" content="product">',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            "Metadata específica para la ficha interna del producto.",
+        )
+
     def test_sale_price_column_label_is_short(self):
         field = Product._meta.get_field("sale_price")
 
@@ -482,6 +543,161 @@ class ProductWebFieldsTests(TestCase):
         self.assertTrue(data["is_featured"])
         self.assertEqual(data["display_priority"], 10)
         self.assertEqual(data["seo_title"], "Aros dorados Mamiru")
+
+    def test_serializer_exposes_computed_seo_metadata(self):
+        product = Product.objects.create(
+            name="Collar Aurora",
+            slug="collar-aurora",
+            category=self.category,
+            supplier=self.supplier,
+            short_description="Collar delicado para uso diario.",
+        )
+
+        data = ProductSerializer(product).data
+
+        self.assertEqual(data["meta_title"], "Collar Aurora | Mamiru")
+        self.assertEqual(data["meta_description"], "Collar delicado para uso diario.")
+        self.assertEqual(data["canonical_path"], "/productos/collar-aurora/")
+
+
+class SeoEndpointTests(TestCase):
+    def setUp(self):
+        self.category = Category.objects.create(name="SEO Aros", slug="seo-aros")
+        self.supplier = Supplier.objects.create(name="Proveedor SEO")
+
+    @override_settings(PUBLIC_SITE_URL="https://mamiru.example")
+    def test_robots_txt_points_to_sitemap_and_blocks_private_paths(self):
+        response = self.client.get("/robots.txt")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "text/plain; charset=utf-8")
+        body = response.content.decode()
+        self.assertIn("Disallow: /admin/", body)
+        self.assertIn("Disallow: /api/", body)
+        self.assertIn("Sitemap: https://mamiru.example/sitemap.xml", body)
+
+    @override_settings(PUBLIC_SITE_URL="https://mamiru.example")
+    def test_sitemap_lists_only_active_web_products_and_their_categories(self):
+        visible_product = Product.objects.create(
+            name="Aro visible",
+            slug="aro-visible",
+            category=self.category,
+            supplier=self.supplier,
+            status=Product.Status.ACTIVE,
+            visible_on_web=True,
+        )
+        Product.objects.create(
+            name="Aro borrador",
+            slug="aro-borrador",
+            category=self.category,
+            supplier=self.supplier,
+            status=Product.Status.DRAFT,
+            visible_on_web=True,
+        )
+        Product.objects.create(
+            name="Aro interno",
+            slug="aro-interno",
+            category=self.category,
+            supplier=self.supplier,
+            status=Product.Status.ACTIVE,
+            visible_on_web=False,
+        )
+
+        response = self.client.get("/sitemap.xml")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/xml; charset=utf-8")
+        root = ElementTree.fromstring(response.content)
+        namespace = {"sitemap": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+        urls = [
+            loc.text
+            for loc in root.findall(".//sitemap:loc", namespace)
+            if loc.text
+        ]
+        self.assertEqual(
+            urls,
+            [
+                "https://mamiru.example/categorias/seo-aros/",
+                "https://mamiru.example/productos/aro-visible/",
+            ],
+        )
+        self.assertNotIn("https://mamiru.example/productos/aro-borrador/", urls)
+        self.assertNotIn("https://mamiru.example/productos/aro-interno/", urls)
+        self.assertContains(response, visible_product.updated_at.date().isoformat())
+
+    @override_settings(PUBLIC_SITE_URL="https://mamiru.example")
+    def test_product_preview_includes_product_metadata(self):
+        product = Product.objects.create(
+            name="Aro dorado",
+            slug="aro-dorado",
+            category=self.category,
+            supplier=self.supplier,
+            status=Product.Status.ACTIVE,
+            visible_on_web=True,
+            seo_title="Aro dorado Mamiru",
+            seo_description="Aro dorado delicado para todos los días.",
+        )
+        ProductImage.objects.create(
+            product=product,
+            image="products/aro-dorado.jpg",
+            is_main=True,
+        )
+
+        response = self.client.get("/productos/aro-dorado/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "<title>Aro dorado Mamiru</title>", html=False)
+        self.assertContains(
+            response,
+            '<meta property="og:type" content="product">',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            '<meta property="og:image" '
+            'content="https://mamiru.example/media/products/aro-dorado.jpg">',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            '<link rel="canonical" href="https://mamiru.example/productos/aro-dorado/">',
+            html=False,
+        )
+
+    def test_product_preview_hides_internal_products(self):
+        Product.objects.create(
+            name="Aro interno",
+            slug="aro-interno-preview",
+            category=self.category,
+            supplier=self.supplier,
+            status=Product.Status.ACTIVE,
+            visible_on_web=False,
+        )
+
+        response = self.client.get("/productos/aro-interno-preview/")
+
+        self.assertEqual(response.status_code, 404)
+
+    @override_settings(PUBLIC_SITE_URL="https://mamiru.example")
+    def test_category_preview_includes_category_metadata(self):
+        Product.objects.create(
+            name="Aro visible categoría",
+            slug="aro-visible-categoria",
+            category=self.category,
+            supplier=self.supplier,
+            status=Product.Status.ACTIVE,
+            visible_on_web=True,
+        )
+
+        response = self.client.get("/categorias/seo-aros/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "<title>SEO Aros | Mamiru</title>", html=False)
+        self.assertContains(
+            response,
+            '<link rel="canonical" href="https://mamiru.example/categorias/seo-aros/">',
+            html=False,
+        )
 
 
 class PriceHistoryTests(TestCase):

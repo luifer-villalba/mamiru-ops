@@ -25,6 +25,9 @@ class ProductSerializer(serializers.ModelSerializer):
     category = CategorySerializer(read_only=True)
     supplier = SupplierSerializer(read_only=True)
     images = ProductImageSerializer(many=True, read_only=True)
+    meta_title = serializers.CharField(read_only=True)
+    meta_description = serializers.CharField(read_only=True)
+    canonical_path = serializers.CharField(source="get_absolute_url", read_only=True)
 
     class Meta:
         model = Product
@@ -58,6 +61,9 @@ class ProductSerializer(serializers.ModelSerializer):
             "public_tags",
             "seo_title",
             "seo_description",
+            "meta_title",
+            "meta_description",
+            "canonical_path",
             "images",
             "created_at",
             "updated_at",
