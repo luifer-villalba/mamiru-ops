@@ -254,7 +254,9 @@ ALLOWED_HOSTS=tuapp.railway.app
 CSRF_TRUSTED_ORIGINS=https://tuapp.railway.app
 DATABASE_URL=<automáticamente provista por Railway PostgreSQL>
 STATIC_ROOT=/app/staticfiles
-MEDIA_ROOT=/app/media
+MEDIA_ROOT=/data/media
+MEDIA_URL=/media/
+SERVE_MEDIA_FILES=True
 ```
 
 Railway detecta el `Dockerfile` automáticamente y usa `entrypoint.sh` como comando de inicio.
@@ -272,15 +274,24 @@ Railway detecta el `Dockerfile` automáticamente y usa `entrypoint.sh` como coma
 | `CSRF_TRUSTED_ORIGINS` | Producción | Orígenes confiables para CSRF |
 | `STATIC_ROOT` | No | Directorio para `collectstatic` |
 | `MEDIA_ROOT` | No | Directorio para imágenes subidas |
+| `MEDIA_URL` | No | URL pública para imágenes subidas |
+| `SERVE_MEDIA_FILES` | No | `True` para servir imágenes subidas desde Django |
 
 ---
 
 ## Notas sobre imágenes en producción
 
-Actualmente las imágenes de productos se almacenan localmente en `media/`. Para producción en Railway (sin storage persistente), se recomienda migrar a:
+Las imágenes de productos se almacenan en `MEDIA_ROOT`. En Railway Pro, crear un
+Volume montado en `/data` y configurar `MEDIA_ROOT=/data/media` permite que las
+imágenes sobrevivan redeploys. Como el admin usa esas imágenes directamente,
+configurar `SERVE_MEDIA_FILES=True` hace que Django sirva `/media/` también con
+`DEBUG=False`.
+
+Para más escala o CDN, se puede migrar a:
 
 - **Cloudinary**: via `django-cloudinary-storage`
 - **Amazon S3**: via `django-storages[s3]`
 - **Supabase Storage**: via `django-storages` + S3-compatible API
 
-La configuración está preparada para esta migración futura modificando `DEFAULT_FILE_STORAGE` en `settings.py`.
+La configuración está preparada para esta migración futura modificando el storage
+default en `settings.py`.

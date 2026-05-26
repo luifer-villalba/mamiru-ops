@@ -780,6 +780,9 @@
         thumb.alt = product.name;
         if (product.thumbnail_url) {
           thumb.src = product.thumbnail_url;
+          thumb.addEventListener("error", () => {
+            thumb.remove();
+          });
         }
         copy.className = "purchase-search-copy";
         main.className = "purchase-search-main";

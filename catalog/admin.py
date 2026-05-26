@@ -58,7 +58,14 @@ def main_image_url(product):
     if image is None:
         image = next(iter(images), None)
 
+    return product_image_url(image)
+
+
+def product_image_url(image):
     if not image or not image.image:
+        return ""
+
+    if not image.image.storage.exists(image.image.name):
         return ""
 
     return image.image.url
@@ -544,13 +551,14 @@ class ProductImageInline(TabularInline):
 
     @admin.display(description="Vista previa")
     def preview(self, obj):
-        if not obj or not obj.image:
+        image_url = product_image_url(obj)
+        if not image_url:
             return "Sin imagen"
 
         return format_html(
             '<img src="{}" alt="{}" style="width: 72px; height: 72px; '
             'object-fit: cover; border-radius: 6px;" />',
-            obj.image.url,
+            image_url,
             obj.product.name,
         )
 

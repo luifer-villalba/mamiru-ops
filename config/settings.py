@@ -135,6 +135,7 @@ STORAGES = {
 # Media files (uploaded images)
 MEDIA_URL = os.environ.get("MEDIA_URL", "/media/")
 MEDIA_ROOT = os.environ.get("MEDIA_ROOT", str(BASE_DIR / "media"))
+SERVE_MEDIA_FILES = os.environ.get("SERVE_MEDIA_FILES", "False") == "True"
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

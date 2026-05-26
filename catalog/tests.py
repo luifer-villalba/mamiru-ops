@@ -21,6 +21,7 @@ from catalog.admin import (
     ProductImageInline,
     PurchaseOrderAdmin,
     build_purchase_lines,
+    main_image_url,
     validate_product_image_upload,
 )
 from config.forms import UsernameOrEmailAuthenticationForm
@@ -99,7 +100,8 @@ class ProductAdminImagePreviewTests(TestCase):
             supplier=self.supplier,
         )
 
-    def test_thumbnail_uses_main_image(self):
+    @mock.patch("django.core.files.storage.FileSystemStorage.exists", return_value=True)
+    def test_thumbnail_uses_main_image(self, storage_exists):
         ProductImage.objects.create(
             product=self.product,
             image="products/secondary.jpg",
@@ -118,8 +120,29 @@ class ProductAdminImagePreviewTests(TestCase):
 
         self.assertIn("/media/products/main.jpg", thumbnail)
         self.assertIn("Producto con foto", thumbnail)
+        storage_exists.assert_called_once_with("products/main.jpg")
 
-    def test_inline_preview_renders_uploaded_image(self):
+    @mock.patch("django.core.files.storage.FileSystemStorage.exists", return_value=False)
+    def test_thumbnail_ignores_missing_image_file(self, storage_exists):
+        ProductImage.objects.create(
+            product=self.product,
+            image="products/missing.jpg",
+            is_main=True,
+        )
+        product_admin = ProductAdmin(Product, admin.site)
+        product = Product.objects.prefetch_related("images").get(pk=self.product.pk)
+
+        self.assertEqual(main_image_url(product), "")
+        self.assertEqual(product_admin.thumbnail(product), "Sin foto")
+        storage_exists.assert_has_calls(
+            [
+                mock.call("products/missing.jpg"),
+                mock.call("products/missing.jpg"),
+            ]
+        )
+
+    @mock.patch("django.core.files.storage.FileSystemStorage.exists", return_value=True)
+    def test_inline_preview_renders_uploaded_image(self, storage_exists):
         product_image = ProductImage.objects.create(
             product=self.product,
             image="products/preview.jpg",
@@ -130,6 +153,7 @@ class ProductAdminImagePreviewTests(TestCase):
 
         self.assertIn("/media/products/preview.jpg", preview)
         self.assertIn("Producto con foto", preview)
+        storage_exists.assert_called_once_with("products/preview.jpg")
 
     def test_product_image_save_keeps_only_one_main_image(self):
         first_image = ProductImage.objects.create(
@@ -433,7 +457,8 @@ class PurchaseOrderAdminTests(TestCase):
         data.update(overrides)
         return data
 
-    def test_product_lookup_returns_existing_product_data(self):
+    @mock.patch("django.core.files.storage.FileSystemStorage.exists", return_value=True)
+    def test_product_lookup_returns_existing_product_data(self, storage_exists):
         response = self.client.get(
             reverse("admin:catalog_product_lookup"),
             {"code": self.product.code},
@@ -455,8 +480,10 @@ class PurchaseOrderAdminTests(TestCase):
                 "margin_percent": "40.00",
             },
         )
+        storage_exists.assert_called_once_with("products/purchase.jpg")
 
-    def test_product_search_returns_products_by_name(self):
+    @mock.patch("django.core.files.storage.FileSystemStorage.exists", return_value=True)
+    def test_product_search_returns_products_by_name(self, storage_exists):
         response = self.client.get(
             reverse("admin:catalog_product_search"),
             {"q": "existente"},
@@ -478,6 +505,7 @@ class PurchaseOrderAdminTests(TestCase):
                 "margin_percent": "40.00",
             },
         )
+        storage_exists.assert_called_once_with("products/purchase.jpg")
 
     def test_new_purchase_updates_existing_stock_and_creates_new_product(self):
         response = self.client.post(
