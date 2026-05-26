@@ -660,11 +660,22 @@ class ProductAdmin(ModelAdmin):
         "cost_price",
         "margin_percent",
         "classification",
+        "visible_on_web",
+        "is_featured",
+        "display_priority",
         "supplier",
         "category",
         "status",
     ]
-    list_filter = [StockLevelFilter, "classification", "category", "supplier", "status"]
+    list_filter = [
+        StockLevelFilter,
+        "visible_on_web",
+        "is_featured",
+        "classification",
+        "category",
+        "supplier",
+        "status",
+    ]
     list_per_page = 25
     ordering = ["code", "name"]
     search_fields = ["code", "name"]
@@ -687,6 +698,40 @@ class ProductAdmin(ModelAdmin):
             },
         ),
         (
+            "Venta web",
+            {
+                "fields": [
+                    "visible_on_web",
+                    "is_featured",
+                    "display_priority",
+                    "short_description",
+                    "description",
+                    "public_tags",
+                ],
+            },
+        ),
+        (
+            "Detalles",
+            {
+                "fields": [
+                    "detailed_material",
+                    "color",
+                    "finish",
+                    "measurements",
+                ],
+            },
+        ),
+        (
+            "Cuidados",
+            {
+                "fields": [
+                    "is_water_resistant",
+                    "is_hypoallergenic",
+                    "care_instructions",
+                ],
+            },
+        ),
+        (
             "Precios y stock",
             {
                 "fields": [
@@ -703,6 +748,13 @@ class ProductAdmin(ModelAdmin):
             "Notas",
             {
                 "fields": ["notes"],
+            },
+        ),
+        (
+            "SEO",
+            {
+                "fields": ["seo_title", "seo_description"],
+                "classes": ["collapse"],
             },
         ),
         (

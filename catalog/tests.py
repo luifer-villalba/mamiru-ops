@@ -25,6 +25,7 @@ from catalog.admin import (
     main_image_url,
     validate_product_image_upload,
 )
+from catalog.serializers import ProductSerializer
 from config.forms import UsernameOrEmailAuthenticationForm
 from config.settings import env_bool
 
@@ -326,6 +327,9 @@ class ProductAdminImagePreviewTests(TestCase):
                 "cost_price",
                 "margin_percent",
                 "classification",
+                "visible_on_web",
+                "is_featured",
+                "display_priority",
                 "supplier",
                 "category",
                 "status",
@@ -335,8 +339,22 @@ class ProductAdminImagePreviewTests(TestCase):
     def test_product_admin_renders_price_sync_source_field(self):
         from catalog.admin import ProductAdmin
 
-        price_fields = ProductAdmin.fieldsets[2][1]["fields"]
+        price_fields = ProductAdmin.fieldsets[5][1]["fields"]
         self.assertIn("price_sync_source", price_fields)
+
+    def test_product_admin_groups_web_fields(self):
+        from catalog.admin import ProductAdmin
+
+        web_fields = ProductAdmin.fieldsets[2][1]["fields"]
+        detail_fields = ProductAdmin.fieldsets[3][1]["fields"]
+        care_fields = ProductAdmin.fieldsets[4][1]["fields"]
+        seo_fields = ProductAdmin.fieldsets[7][1]["fields"]
+
+        self.assertIn("visible_on_web", web_fields)
+        self.assertIn("short_description", web_fields)
+        self.assertIn("detailed_material", detail_fields)
+        self.assertIn("is_water_resistant", care_fields)
+        self.assertIn("seo_title", seo_fields)
 
     def test_sale_price_column_label_is_short(self):
         field = Product._meta.get_field("sale_price")
@@ -363,6 +381,21 @@ class ProductAdminFormPriceSyncTests(TestCase):
             "sale_price": "10000",
             "stock": "1",
             "status": Product.Status.ACTIVE,
+            "short_description": "",
+            "description": "",
+            "detailed_material": "",
+            "color": "",
+            "finish": "",
+            "measurements": "",
+            "care_instructions": "",
+            "is_water_resistant": "",
+            "is_hypoallergenic": "",
+            "visible_on_web": "",
+            "is_featured": "",
+            "display_priority": "0",
+            "public_tags": "",
+            "seo_title": "",
+            "seo_description": "",
             "notes": "",
             "price_sync_source": "margin_percent",
         }
@@ -394,6 +427,61 @@ class ProductAdminFormPriceSyncTests(TestCase):
 
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(form.cleaned_data["margin_percent"], Decimal("63.64"))
+
+
+class ProductWebFieldsTests(TestCase):
+    def setUp(self):
+        self.category = Category.objects.create(name="Web", slug="web")
+        self.supplier = Supplier.objects.create(name="Proveedor web")
+
+    def test_web_fields_have_operator_friendly_defaults(self):
+        product = Product.objects.create(
+            name="Producto web",
+            slug="producto-web",
+            category=self.category,
+            supplier=self.supplier,
+        )
+
+        self.assertEqual(product.classification, Product.Classification.ESSENTIALS)
+        self.assertFalse(product.visible_on_web)
+        self.assertFalse(product.is_featured)
+        self.assertFalse(product.is_water_resistant)
+        self.assertFalse(product.is_hypoallergenic)
+        self.assertEqual(product.display_priority, 0)
+        self.assertEqual(product.short_description, "")
+
+    def test_serializer_exposes_web_fields(self):
+        product = Product.objects.create(
+            name="Producto visible",
+            slug="producto-visible",
+            category=self.category,
+            supplier=self.supplier,
+            short_description="Aros delicados para todos los días.",
+            description="Descripción pensada para la ficha web.",
+            detailed_material="Acero inoxidable 316L con PVD 18K",
+            color="Dorado",
+            finish="Pulido",
+            measurements="2 cm",
+            care_instructions="Guardar seco.",
+            is_water_resistant=True,
+            is_hypoallergenic=True,
+            visible_on_web=True,
+            is_featured=True,
+            display_priority=10,
+            public_tags="minimalista, regalo",
+            seo_title="Aros dorados Mamiru",
+            seo_description="Aros dorados delicados de Mamiru.",
+        )
+
+        data = ProductSerializer(product).data
+
+        self.assertEqual(data["short_description"], "Aros delicados para todos los días.")
+        self.assertEqual(data["detailed_material"], "Acero inoxidable 316L con PVD 18K")
+        self.assertEqual(data["color"], "Dorado")
+        self.assertTrue(data["visible_on_web"])
+        self.assertTrue(data["is_featured"])
+        self.assertEqual(data["display_priority"], 10)
+        self.assertEqual(data["seo_title"], "Aros dorados Mamiru")
 
 
 class PriceHistoryTests(TestCase):
@@ -433,6 +521,21 @@ class PriceHistoryTests(TestCase):
             "price_sync_source": "sale_price",
             "stock": str(self.product.stock),
             "status": self.product.status,
+            "short_description": self.product.short_description,
+            "description": self.product.description,
+            "detailed_material": self.product.detailed_material,
+            "color": self.product.color,
+            "finish": self.product.finish,
+            "measurements": self.product.measurements,
+            "care_instructions": self.product.care_instructions,
+            "is_water_resistant": "",
+            "is_hypoallergenic": "",
+            "visible_on_web": "",
+            "is_featured": "",
+            "display_priority": str(self.product.display_priority),
+            "public_tags": self.product.public_tags,
+            "seo_title": self.product.seo_title,
+            "seo_description": self.product.seo_description,
             "notes": self.product.notes,
             "images-TOTAL_FORMS": "0",
             "images-INITIAL_FORMS": "0",

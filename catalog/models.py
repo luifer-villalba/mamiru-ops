@@ -90,6 +90,25 @@ class Product(models.Model):
         choices=Status.choices,
         default=Status.DRAFT,
     )
+    short_description = models.CharField("Descripción corta", max_length=300, blank=True)
+    description = models.TextField("Descripción", blank=True)
+    detailed_material = models.CharField(
+        "Material detallado",
+        max_length=300,
+        blank=True,
+    )
+    color = models.CharField("Color", max_length=100, blank=True)
+    finish = models.CharField("Acabado", max_length=100, blank=True)
+    measurements = models.CharField("Medidas", max_length=200, blank=True)
+    care_instructions = models.TextField("Cuidados", blank=True)
+    is_water_resistant = models.BooleanField("Resistente al agua", default=False)
+    is_hypoallergenic = models.BooleanField("Hipoalergénico", default=False)
+    visible_on_web = models.BooleanField("Visible en web", default=False)
+    is_featured = models.BooleanField("Destacado", default=False)
+    display_priority = models.PositiveIntegerField("Prioridad web", default=0)
+    public_tags = models.CharField("Tags públicos", max_length=300, blank=True)
+    seo_title = models.CharField("Título SEO", max_length=300, blank=True)
+    seo_description = models.CharField("Descripción SEO", max_length=500, blank=True)
     notes = models.TextField("Notas", blank=True)
     created_at = models.DateTimeField("Creado", auto_now_add=True)
     updated_at = models.DateTimeField("Actualizado", auto_now=True)
