@@ -682,12 +682,22 @@ class ProductAdmin(ModelAdmin):
     actions = ["mark_as_active", "mark_as_sold_out", "mark_as_hidden"]
     prepopulated_fields = {"slug": ("name",)}
     inlines = [ProductImageInline, PriceHistoryInline]
-    readonly_fields = ["code", "created_at", "updated_at"]
+    readonly_fields = [
+        "code",
+        "product_form_image_preview",
+        "created_at",
+        "updated_at",
+    ]
     fieldsets = [
         (
             "Identificación",
             {
-                "fields": ["code", "name", "slug", "status"],
+                "fields": [
+                    ("code", "product_form_image_preview"),
+                    "name",
+                    "slug",
+                    "status",
+                ],
                 "description": "El código se genera automáticamente al guardar.",
             },
         ),
@@ -781,6 +791,35 @@ class ProductAdmin(ModelAdmin):
         return format_html(
             '<img src="{}" alt="{}" style="width: 48px; height: 48px; '
             'object-fit: cover; border-radius: 6px;" />',
+            image_url,
+            obj.name,
+        )
+
+    @admin.display(description="Vista previa")
+    def product_form_image_preview(self, obj):
+        image_url = main_image_url(obj) if obj and obj.pk else ""
+        if not image_url:
+            return format_html(
+                '<div data-product-form-image-preview '
+                'style="width: 160px; min-height: 160px;">'
+                '<div data-product-form-image-placeholder '
+                'style="align-items: center; background: #f3f4f6; '
+                'border: 1px dashed #d1d5db; border-radius: 8px; '
+                'color: #6b7280; display: flex; font-size: 13px; '
+                'font-weight: 600; height: 160px; justify-content: center; '
+                'text-align: center; width: 160px;">'
+                "{}"
+                "</div>"
+                "</div>",
+                "Sin imagen",
+            )
+
+        return format_html(
+            '<div data-product-form-image-preview style="width: 160px;">'
+            '<img data-product-form-image-preview-img src="{}" alt="{}" '
+            'style="border-radius: 8px; height: 160px; object-fit: cover; '
+            'width: 160px;" />'
+            "</div>",
             image_url,
             obj.name,
         )

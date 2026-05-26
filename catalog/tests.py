@@ -209,6 +209,60 @@ class ProductAdminImagePreviewTests(TestCase):
         self.assertIn("Producto con foto", preview)
         storage_exists.assert_called_once_with("products/preview.jpg")
 
+    @mock.patch("django.core.files.storage.FileSystemStorage.exists", return_value=True)
+    def test_form_preview_uses_main_image(self, storage_exists):
+        ProductImage.objects.create(
+            product=self.product,
+            image="products/secondary.jpg",
+            sort_order=1,
+        )
+        ProductImage.objects.create(
+            product=self.product,
+            image="products/main.jpg",
+            is_main=True,
+            sort_order=2,
+        )
+        product_admin = ProductAdmin(Product, admin.site)
+        product = Product.objects.prefetch_related("images").get(pk=self.product.pk)
+
+        preview = str(product_admin.product_form_image_preview(product))
+
+        self.assertIn("data-product-form-image-preview", preview)
+        self.assertIn("/media/products/main.jpg", preview)
+        self.assertIn("Producto con foto", preview)
+        storage_exists.assert_called_once_with("products/main.jpg")
+
+    @mock.patch("django.core.files.storage.FileSystemStorage.exists", return_value=True)
+    def test_form_preview_uses_first_image_when_no_main_image(self, storage_exists):
+        ProductImage.objects.create(
+            product=self.product,
+            image="products/first.jpg",
+            sort_order=1,
+        )
+        ProductImage.objects.create(
+            product=self.product,
+            image="products/second.jpg",
+            sort_order=2,
+        )
+        product_admin = ProductAdmin(Product, admin.site)
+        product = Product.objects.prefetch_related("images").get(pk=self.product.pk)
+
+        preview = str(product_admin.product_form_image_preview(product))
+
+        self.assertIn("/media/products/first.jpg", preview)
+        storage_exists.assert_called_once_with("products/first.jpg")
+
+    def test_form_preview_renders_placeholder_without_image(self):
+        product_admin = ProductAdmin(Product, admin.site)
+
+        existing_preview = str(product_admin.product_form_image_preview(self.product))
+        create_preview = str(product_admin.product_form_image_preview(None))
+
+        self.assertIn("data-product-form-image-preview", existing_preview)
+        self.assertIn("Sin imagen", existing_preview)
+        self.assertIn("data-product-form-image-preview", create_preview)
+        self.assertIn("Sin imagen", create_preview)
+
     def test_product_image_save_keeps_only_one_main_image(self):
         first_image = ProductImage.objects.create(
             product=self.product,
@@ -368,11 +422,13 @@ class ProductAdminImagePreviewTests(TestCase):
     def test_product_admin_groups_web_fields(self):
         from catalog.admin import ProductAdmin
 
+        identification_fields = ProductAdmin.fieldsets[0][1]["fields"]
         web_fields = ProductAdmin.fieldsets[3][1]["fields"]
         detail_fields = ProductAdmin.fieldsets[4][1]["fields"]
         care_fields = ProductAdmin.fieldsets[5][1]["fields"]
         seo_fields = ProductAdmin.fieldsets[7][1]["fields"]
 
+        self.assertIn(("code", "product_form_image_preview"), identification_fields)
         self.assertIn("visible_on_web", web_fields)
         self.assertIn("short_description", web_fields)
         self.assertIn("detailed_material", detail_fields)
