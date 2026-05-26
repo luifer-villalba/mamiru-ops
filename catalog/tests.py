@@ -17,6 +17,7 @@ from PIL import Image
 from catalog.admin import (
     CustomerAdmin,
     OrderAdmin,
+    OrderLineInline,
     PriceHistoryInline,
     ProductAdmin,
     ProductAdminForm,
@@ -177,7 +178,9 @@ class ProductAdminImagePreviewTests(TestCase):
         self.assertIn("Producto con foto", thumbnail)
         storage_exists.assert_called_once_with("products/main.jpg")
 
-    @mock.patch("django.core.files.storage.FileSystemStorage.exists", return_value=False)
+    @mock.patch(
+        "django.core.files.storage.FileSystemStorage.exists", return_value=False
+    )
     def test_thumbnail_ignores_missing_image_file(self, storage_exists):
         ProductImage.objects.create(
             product=self.product,
@@ -301,7 +304,9 @@ class ProductAdminImagePreviewTests(TestCase):
         storage_delete.assert_called_once_with("products/delete-me.jpg")
 
     @mock.patch("django.core.files.storage.FileSystemStorage.delete")
-    @mock.patch("django.core.files.storage.FileSystemStorage.exists", return_value=False)
+    @mock.patch(
+        "django.core.files.storage.FileSystemStorage.exists", return_value=False
+    )
     def test_product_image_delete_ignores_missing_file(
         self,
         storage_exists,
@@ -616,7 +621,9 @@ class ProductWebFieldsTests(TestCase):
 
         data = ProductSerializer(product).data
 
-        self.assertEqual(data["short_description"], "Aros delicados para todos los días.")
+        self.assertEqual(
+            data["short_description"], "Aros delicados para todos los días."
+        )
         self.assertEqual(data["detailed_material"], "Acero inoxidable 316L con PVD 18K")
         self.assertEqual(data["color"], "Dorado")
         self.assertTrue(data["visible_on_web"])
@@ -690,9 +697,7 @@ class SeoEndpointTests(TestCase):
         root = ElementTree.fromstring(response.content)
         namespace = {"sitemap": "http://www.sitemaps.org/schemas/sitemap/0.9"}
         urls = [
-            loc.text
-            for loc in root.findall(".//sitemap:loc", namespace)
-            if loc.text
+            loc.text for loc in root.findall(".//sitemap:loc", namespace) if loc.text
         ]
         self.assertEqual(
             urls,
@@ -953,6 +958,7 @@ class PurchaseOrderAdminTests(TestCase):
             response.json(),
             {
                 "found": True,
+                "id": self.product.pk,
                 "name": "Aro existente",
                 "category_id": self.category.pk,
                 "category_name": "Compra test",
@@ -994,6 +1000,7 @@ class PurchaseOrderAdminTests(TestCase):
             response.json()["results"][0],
             {
                 "code": "269999",
+                "id": self.product.pk,
                 "name": "Aro existente",
                 "category_id": self.category.pk,
                 "category_name": "Compra test",
@@ -1150,6 +1157,7 @@ class CustomerOrderTests(TestCase):
         )
         self.customer = Customer.objects.create(
             name="Eli Cliente",
+            ruc="1234567-8",
             whatsapp="0981123456",
             city="Asunción",
         )
@@ -1158,15 +1166,70 @@ class CustomerOrderTests(TestCase):
         admin_instance = CustomerAdmin(Customer, admin.site)
 
         self.assertIn("name", admin_instance.list_display)
+        self.assertIn("ruc", admin_instance.list_display)
         self.assertIn("whatsapp", admin_instance.list_display)
         self.assertEqual(str(self.customer), "Eli Cliente")
+        self.assertEqual(self.customer.ruc, "1234567-8")
         self.assertEqual(self.customer.whatsapp, "0981123456")
+
+    def test_order_status_includes_invoice_pending(self):
+        self.assertIn(
+            (Order.Status.INVOICE_PENDING, "Factura pendiente"),
+            Order.Status.choices,
+        )
 
     def test_order_total_uses_current_product_price_before_confirmation(self):
         order = Order.objects.create(customer=self.customer, created_by=self.user)
         OrderLine.objects.create(order=order, product=self.product, quantity=2)
 
         self.assertEqual(order.total, 30000)
+
+    def test_order_operational_fields_have_safe_defaults(self):
+        order = Order.objects.create(customer=self.customer, created_by=self.user)
+
+        self.assertEqual(order.source, "")
+        self.assertEqual(order.delivery_type, Order.DeliveryType.PICKUP)
+        self.assertEqual(order.delivery_city, "")
+        self.assertEqual(order.discount_amount, 0)
+        self.assertEqual(order.payment_method, "")
+
+    def test_order_delivery_city_and_payment_method_are_saved(self):
+        order = Order.objects.create(
+            customer=self.customer,
+            created_by=self.user,
+            source=Order.Source.INSTAGRAM,
+            delivery_type=Order.DeliveryType.SHIPPING,
+            delivery_city="Pilar",
+            payment_method=Order.PaymentMethod.UENO,
+        )
+
+        order.refresh_from_db()
+        self.assertEqual(order.source, Order.Source.INSTAGRAM)
+        self.assertEqual(order.delivery_type, Order.DeliveryType.SHIPPING)
+        self.assertEqual(order.delivery_city, "Pilar")
+        self.assertEqual(order.payment_method, Order.PaymentMethod.UENO)
+
+    def test_order_total_applies_discount(self):
+        order = Order.objects.create(
+            customer=self.customer,
+            created_by=self.user,
+            discount_amount=10000,
+        )
+        OrderLine.objects.create(order=order, product=self.product, quantity=3)
+
+        self.assertEqual(order.subtotal, 45000)
+        self.assertEqual(order.total, 35000)
+
+    def test_order_total_never_goes_below_zero(self):
+        order = Order.objects.create(
+            customer=self.customer,
+            created_by=self.user,
+            discount_amount=50000,
+        )
+        OrderLine.objects.create(order=order, product=self.product, quantity=2)
+
+        self.assertEqual(order.subtotal, 30000)
+        self.assertEqual(order.total, 0)
 
     def test_confirming_order_saves_product_snapshot(self):
         order = Order.objects.create(customer=self.customer, created_by=self.user)
@@ -1185,6 +1248,8 @@ class CustomerOrderTests(TestCase):
         self.assertEqual(line.product_code, "260124")
         self.assertEqual(line.unit_price, 18000)
         self.assertEqual(order.total, 36000)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 2)
 
         self.product.sale_price = 22000
         self.product.name = "Collar posterior"
@@ -1197,6 +1262,81 @@ class CustomerOrderTests(TestCase):
         self.assertEqual(line.product_name, "Collar editado")
         self.assertEqual(line.unit_price, 18000)
         self.assertEqual(line.total, 54000)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 1)
+
+    def test_deposit_status_does_not_refresh_confirmed_line_snapshot(self):
+        order = Order.objects.create(customer=self.customer, created_by=self.user)
+        line = OrderLine.objects.create(order=order, product=self.product, quantity=1)
+
+        order.status = Order.Status.CONFIRMED
+        order.save()
+
+        Product.objects.filter(pk=self.product.pk).update(
+            sale_price=21000,
+            name="Collar actualizado después de seña",
+        )
+
+        order.status = Order.Status.DEPOSIT
+        order.save()
+
+        line.refresh_from_db()
+        self.assertEqual(line.product_name, "Collar inicial")
+        self.assertEqual(line.unit_price, 15000)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 3)
+
+    def test_cancelled_order_restores_reserved_stock(self):
+        order = Order.objects.create(customer=self.customer, created_by=self.user)
+        OrderLine.objects.create(order=order, product=self.product, quantity=2)
+
+        order.status = Order.Status.CONFIRMED
+        order.save()
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 2)
+
+        order.status = Order.Status.CANCELLED
+        order.save()
+
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 4)
+
+    def test_cancelled_order_and_deleted_line_restores_stock_once(self):
+        order = Order.objects.create(customer=self.customer, created_by=self.user)
+        line = OrderLine.objects.create(order=order, product=self.product, quantity=2)
+
+        order.status = Order.Status.CONFIRMED
+        order.save()
+        stale_line = OrderLine.objects.get(pk=line.pk)
+
+        order.status = Order.Status.CANCELLED
+        order.save()
+        stale_line.delete()
+
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 4)
+
+    def test_invoice_pending_keeps_stock_reserved_without_double_discount(self):
+        order = Order.objects.create(customer=self.customer, created_by=self.user)
+        OrderLine.objects.create(order=order, product=self.product, quantity=2)
+
+        order.status = Order.Status.CONFIRMED
+        order.save()
+        order.status = Order.Status.INVOICE_PENDING
+        order.save()
+
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 2)
+
+    def test_order_line_inline_displays_current_product_data_before_confirmation(self):
+        order = Order.objects.create(customer=self.customer, created_by=self.user)
+        line = OrderLine.objects.create(order=order, product=self.product, quantity=2)
+        inline = OrderLineInline(Order, admin.site)
+
+        self.assertEqual(inline.product_code_display(line), "260123")
+        self.assertEqual(inline.product_name_display(line), "Collar inicial")
+        self.assertEqual(inline.unit_price_display(line), "₲ 15.000")
+        self.assertEqual(inline.line_total(line), "₲ 30.000")
 
     def test_customer_detail_shows_order_history_inline(self):
         order = Order.objects.create(
@@ -1210,6 +1350,7 @@ class CustomerOrderTests(TestCase):
 
         self.assertEqual(admin_instance.inlines[0].model, Order)
         self.assertEqual(inline.total_display(order), "₲ 15.000")
+        self.assertEqual(inline.customer_ruc_display(order), "1234567-8")
 
     def test_order_admin_sets_created_by_and_displays_total(self):
         order = Order(customer=self.customer, status=Order.Status.DRAFT)
@@ -1225,6 +1366,87 @@ class CustomerOrderTests(TestCase):
 
         self.assertEqual(order.created_by, self.user)
         self.assertEqual(admin_instance.total_display(order), "₲ 45.000")
+        self.assertEqual(admin_instance.customer_ruc_display(order), "1234567-8")
+        self.assertIn("Crear cliente", str(admin_instance.customer_create_link(order)))
+
+    def test_order_lines_inline_is_rendered_on_the_same_page(self):
+        admin_instance = OrderAdmin(Order, admin.site)
+        inline = admin_instance.inlines[0]
+
+        self.assertEqual(inline, OrderLineInline)
+        self.assertFalse(getattr(inline, "tab", False))
+        self.assertEqual(
+            admin_instance.change_form_template,
+            "admin/catalog/order/change_form.html",
+        )
+        self.assertEqual(
+            admin_instance.Media.js,
+            ["catalog/js/order_product_search.js"],
+        )
+        self.assertEqual(
+            admin_instance.Media.css,
+            {"all": ["catalog/css/order_admin.css"]},
+        )
+        self.assertEqual(admin_instance.fieldsets[0][0], "Pedido")
+        self.assertEqual(admin_instance.fieldsets[1][0], "Entrega")
+        self.assertEqual(admin_instance.fieldsets[2][0], "Resumen")
+
+    @override_settings(
+        STORAGES={
+            "default": {
+                "BACKEND": "django.core.files.storage.FileSystemStorage",
+            },
+            "staticfiles": {
+                "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+            },
+        }
+    )
+    def test_order_change_form_shows_lines_before_summary_and_audit(self):
+        order = Order.objects.create(customer=self.customer, created_by=self.user)
+        OrderLine.objects.create(order=order, product=self.product, quantity=1)
+
+        response = self.client.get(
+            reverse("admin:catalog_order_change", args=[order.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        lines_position = content.index("Líneas de pedido")
+        summary_position = content.index("Resumen")
+        audit_position = content.index("Auditoría")
+        self.assertLess(lines_position, summary_position)
+        self.assertLess(lines_position, audit_position)
+        self.assertContains(response, "Alt")
+        self.assertContains(response, "Buscar producto")
+        self.assertContains(response, "data-order-product-search-url")
+        self.assertContains(response, "data-order-product-lookup-url")
+        self.assertContains(response, "Crear cliente")
+
+    def test_order_admin_exposes_operational_fields_and_discount_summary(self):
+        order = Order.objects.create(
+            customer=self.customer,
+            status=Order.Status.DEPOSIT,
+            source=Order.Source.WHATSAPP,
+            delivery_type=Order.DeliveryType.SHIPPING,
+            delivery_city="Pilar",
+            payment_method=Order.PaymentMethod.CASH,
+            discount_amount=10000,
+            created_by=self.user,
+        )
+        OrderLine.objects.create(order=order, product=self.product, quantity=3)
+        admin_instance = OrderAdmin(Order, admin.site)
+
+        self.assertIn("source", admin_instance.list_display)
+        self.assertIn("delivery_type", admin_instance.list_display)
+        self.assertIn("payment_method", admin_instance.list_display)
+        self.assertIn("customer_ruc_display", admin_instance.list_display)
+        self.assertIn("source", admin_instance.list_filter)
+        self.assertIn("delivery_type", admin_instance.list_filter)
+        self.assertIn("payment_method", admin_instance.list_filter)
+        self.assertEqual(admin_instance.subtotal_display(order), "₲ 45.000")
+        self.assertEqual(admin_instance.discount_display(order), "₲ 10.000")
+        self.assertEqual(admin_instance.total_display(order), "₲ 35.000")
+        self.assertIn("Seña recibida", str(admin_instance.status_badge(order)))
 
 
 class UsernameOrEmailBackendTests(TestCase):

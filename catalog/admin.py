@@ -129,18 +129,21 @@ def parse_optional_pk(value):
 
 def product_lookup_view(request):
     code = clean_text(request.GET.get("code", ""))
-    product = (
-        Product.objects.select_related("category", "supplier")
-        .prefetch_related("images")
-        .filter(code=code)
-        .first()
+    product_id = parse_optional_pk(request.GET.get("id", ""))
+    product = Product.objects.select_related("category", "supplier").prefetch_related(
+        "images"
     )
+    if product_id:
+        product = product.filter(pk=product_id).first()
+    else:
+        product = product.filter(code=code).first()
     if not product:
         return JsonResponse({"found": False})
 
     return JsonResponse(
         {
             "found": True,
+            "id": product.pk,
             "name": product.name,
             "category_id": product.category_id,
             "category_name": product.category.name,
@@ -173,6 +176,7 @@ def product_search_view(request):
             "results": [
                 {
                     "code": product.code,
+                    "id": product.pk,
                     "name": product.name,
                     "category_id": product.category_id,
                     "category_name": product.category.name,
@@ -529,7 +533,14 @@ class CustomerOrderInline(TabularInline):
     model = Order
     extra = 0
     can_delete = False
-    fields = ["date", "status", "total_display", "created_by", "created_at"]
+    fields = [
+        "date",
+        "status",
+        "customer_ruc_display",
+        "total_display",
+        "created_by",
+        "created_at",
+    ]
     readonly_fields = fields
     tab = True
     verbose_name = "Pedido"
@@ -542,18 +553,22 @@ class CustomerOrderInline(TabularInline):
     def total_display(self, obj):
         return format_guarani(obj.total)
 
+    @admin.display(description="RUC")
+    def customer_ruc_display(self, obj):
+        return obj.customer.ruc or "-"
+
 
 @admin.register(Customer)
 class CustomerAdmin(ModelAdmin):
-    list_display = ["name", "whatsapp", "city", "created_at"]
-    search_fields = ["name", "whatsapp", "city"]
+    list_display = ["name", "ruc", "whatsapp", "city", "created_at"]
+    search_fields = ["name", "ruc", "whatsapp", "city"]
     inlines = [CustomerOrderInline]
     readonly_fields = ["created_at"]
     fieldsets = [
         (
             "Cliente",
             {
-                "fields": ["name", "whatsapp", "city", "notes"],
+                "fields": ["name", "ruc", "whatsapp", "city", "notes"],
             },
         ),
         (
@@ -802,13 +817,13 @@ class ProductAdmin(ModelAdmin):
         image_url = main_image_url(obj) if obj and obj.pk else ""
         if not image_url:
             return format_html(
-                '<div data-product-form-image-preview '
+                "<div data-product-form-image-preview "
                 'style="width: 160px; min-height: 160px;">'
-                '<div data-product-form-image-placeholder '
+                "<div data-product-form-image-placeholder "
                 'style="align-items: center; background: #f3f4f6; '
-                'border: 1px dashed #d1d5db; border-radius: 8px; '
-                'color: #6b7280; display: flex; font-size: 13px; '
-                'font-weight: 600; height: 160px; justify-content: center; '
+                "border: 1px dashed #d1d5db; border-radius: 8px; "
+                "color: #6b7280; display: flex; font-size: 13px; "
+                "font-weight: 600; height: 160px; justify-content: center; "
                 'text-align: center; width: 160px;">'
                 "{}"
                 "</div>"
@@ -872,48 +887,132 @@ class OrderLineInline(TabularInline):
     fields = [
         "product",
         "quantity",
-        "product_code",
-        "product_name",
-        "unit_price",
+        "product_code_display",
+        "product_name_display",
+        "unit_price_display",
         "line_total",
     ]
-    readonly_fields = ["product_code", "product_name", "unit_price", "line_total"]
+    readonly_fields = [
+        "product_code_display",
+        "product_name_display",
+        "unit_price_display",
+        "line_total",
+    ]
     autocomplete_fields = ["product"]
-    tab = True
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        formfield = super().formfield_for_foreignkey(db_field, request, **kwargs)
+        if db_field.name == "product":
+            formfield.label = "Buscar producto"
+        return formfield
+
+    @admin.display(description="Código")
+    def product_code_display(self, obj):
+        if not obj:
+            return "-"
+        if obj.product_code:
+            return obj.product_code
+        if obj.product_id and obj.product:
+            return obj.product.code
+        return "-"
+
+    @admin.display(description="Nombre")
+    def product_name_display(self, obj):
+        if not obj:
+            return "-"
+        if obj.product_name:
+            return obj.product_name
+        if obj.product_id and obj.product:
+            return obj.product.name
+        return "-"
+
+    @admin.display(description="Precio unitario")
+    def unit_price_display(self, obj):
+        return format_guarani(obj.effective_unit_price) if obj else "-"
 
     @admin.display(description="Total")
     def line_total(self, obj):
-        return format_guarani(obj.total) if obj and obj.pk else ""
+        if not obj or obj.quantity is None:
+            return "-"
+        return format_guarani(obj.total)
 
 
 @admin.register(Order)
 class OrderAdmin(ModelAdmin):
+    change_form_template = "admin/catalog/order/change_form.html"
     list_display = [
         "id",
         "customer",
+        "customer_ruc_display",
         "date",
-        "status",
+        "status_badge",
+        "source",
+        "delivery_type",
+        "delivery_city",
+        "payment_method",
         "total_display",
         "created_by",
         "created_at",
     ]
-    list_filter = ["status", "date", "customer"]
+    list_filter = [
+        "status",
+        "source",
+        "delivery_type",
+        "payment_method",
+        "date",
+        "customer",
+    ]
     search_fields = [
         "customer__name",
+        "customer__ruc",
         "customer__whatsapp",
         "lines__product_name",
         "lines__product_code",
         "lines__product__name",
         "lines__product__code",
     ]
-    readonly_fields = ["created_by", "created_at", "total_display"]
+    readonly_fields = [
+        "created_by",
+        "created_at",
+        "customer_create_link",
+        "customer_ruc_display",
+        "subtotal_display",
+        "discount_display",
+        "total_display",
+    ]
     autocomplete_fields = ["customer"]
     inlines = [OrderLineInline]
     fieldsets = [
         (
             "Pedido",
             {
-                "fields": ["customer", "date", "status", "notes", "total_display"],
+                "fields": [
+                    "customer",
+                    "customer_create_link",
+                    "customer_ruc_display",
+                    "date",
+                    "status",
+                    "source",
+                    "payment_method",
+                    "notes",
+                ],
+            },
+        ),
+        (
+            "Entrega",
+            {
+                "fields": ["delivery_type", "delivery_city"],
+            },
+        ),
+        (
+            "Resumen",
+            {
+                "fields": [
+                    "subtotal_display",
+                    "discount_amount",
+                    "discount_display",
+                    "total_display",
+                ],
             },
         ),
         (
@@ -931,6 +1030,47 @@ class OrderAdmin(ModelAdmin):
             "lines__product"
         )
 
+    @admin.display(description="Estado", ordering="status")
+    def status_badge(self, obj):
+        colors = {
+            Order.Status.DRAFT: ("#64748b", "#f1f5f9"),
+            Order.Status.CONFIRMED: ("#1d4ed8", "#dbeafe"),
+            Order.Status.DEPOSIT: ("#047857", "#d1fae5"),
+            Order.Status.INVOICE_PENDING: ("#a16207", "#fef3c7"),
+            Order.Status.DELIVERED: ("#4338ca", "#e0e7ff"),
+            Order.Status.CANCELLED: ("#b91c1c", "#fee2e2"),
+        }
+        color, background = colors.get(obj.status, ("#374151", "#f3f4f6"))
+        return format_html(
+            '<span style="background: {}; border-radius: 999px; color: {}; '
+            "display: inline-block; font-size: 12px; font-weight: 700; "
+            'line-height: 1; padding: 6px 10px;">{}</span>',
+            background,
+            color,
+            obj.get_status_display(),
+        )
+
+    @admin.display(description="Crear cliente")
+    def customer_create_link(self, obj):
+        return format_html(
+            '<a class="button" href="{}" target="_blank" rel="noopener">Crear cliente</a>',
+            reverse("admin:catalog_customer_add"),
+        )
+
+    @admin.display(description="RUC", ordering="customer__ruc")
+    def customer_ruc_display(self, obj):
+        if not obj or not obj.customer_id:
+            return "-"
+        return obj.customer.ruc or "-"
+
+    @admin.display(description="Subtotal")
+    def subtotal_display(self, obj):
+        return format_guarani(obj.subtotal)
+
+    @admin.display(description="Descuento aplicado")
+    def discount_display(self, obj):
+        return format_guarani(obj.discount_amount)
+
     @admin.display(description="Total")
     def total_display(self, obj):
         return format_guarani(obj.total)
@@ -939,6 +1079,10 @@ class OrderAdmin(ModelAdmin):
         if not obj.created_by_id:
             obj.created_by = request.user
         super().save_model(request, obj, form, change)
+
+    class Media:
+        css = {"all": ["catalog/css/order_admin.css"]}
+        js = ["catalog/js/order_product_search.js"]
 
 
 @admin.register(PurchaseOrder)

@@ -1,0 +1,52 @@
+{% extends "admin/change_form.html" %}
+
+{% block form_top %}
+    {{ block.super }}
+    <div
+        class="order-shortcuts-box"
+        data-order-product-search-url="{% url 'admin:catalog_product_search' %}"
+        data-order-product-lookup-url="{% url 'admin:catalog_product_lookup' %}"
+    >
+        <strong>Carga rápida</strong>
+        <span><kbd>Alt</kbd> + <kbd>A</kbd> agregar línea</span>
+        <span><kbd>Alt</kbd> + <kbd>B</kbd> buscar producto</span>
+        <span><kbd>Alt</kbd> + <kbd>C</kbd> ir a última línea</span>
+        <span><kbd>Esc</kbd> cerrar búsqueda</span>
+    </div>
+{% endblock %}
+
+{% block field_sets %}
+    {% with has_conditional_display=adminform.model_admin.conditional_fields %}
+        {% for fieldset in adminform %}
+            {% if forloop.counter <= 2 and "tab" not in fieldset.classes %}
+                {% include "admin/includes/fieldset.html" %}
+            {% endif %}
+        {% endfor %}
+
+        {% for inline_admin_formset in inline_admin_formsets %}
+            {% include inline_admin_formset.opts.template %}
+        {% endfor %}
+
+        {% for fieldset in adminform %}
+            {% if forloop.counter > 2 and "tab" not in fieldset.classes %}
+                {% include "admin/includes/fieldset.html" %}
+            {% endif %}
+        {% endfor %}
+    {% endwith %}
+{% endblock %}
+
+{% block inline_field_sets %}{% endblock %}
+
+{% block after_related_objects %}
+    {{ block.super }}
+    <div class="order-product-search-modal" id="order-product-search-modal" hidden>
+        <div class="order-product-search-panel" role="dialog" aria-modal="true" aria-labelledby="order-product-search-title">
+            <div class="order-product-search-header">
+                <h2 id="order-product-search-title">Buscar producto</h2>
+                <button class="order-product-search-close" type="button" aria-label="Cerrar">×</button>
+            </div>
+            <input class="order-product-search-input" type="search" autocomplete="off" placeholder="Código o nombre">
+            <div class="order-product-search-results"></div>
+        </div>
+    </div>
+{% endblock %}

@@ -94,7 +94,9 @@ class Product(models.Model):
         choices=Status.choices,
         default=Status.DRAFT,
     )
-    short_description = models.CharField("Descripción corta", max_length=300, blank=True)
+    short_description = models.CharField(
+        "Descripción corta", max_length=300, blank=True
+    )
     description = models.TextField("Descripción", blank=True)
     detailed_material = models.CharField(
         "Material detallado",
@@ -268,6 +270,7 @@ class PriceHistory(models.Model):
 
 class Customer(models.Model):
     name = models.CharField("Nombre", max_length=200)
+    ruc = models.CharField("RUC", max_length=30, blank=True)
     whatsapp = models.CharField("WhatsApp", max_length=50, blank=True)
     city = models.CharField("Ciudad", max_length=100, blank=True)
     notes = models.TextField("Notas", blank=True)
@@ -286,8 +289,27 @@ class Order(models.Model):
     class Status(models.TextChoices):
         DRAFT = "draft", "Borrador"
         CONFIRMED = "confirmed", "Confirmado"
+        DEPOSIT = "deposit", "Seña recibida"
+        INVOICE_PENDING = "invoice_pending", "Factura pendiente"
         DELIVERED = "delivered", "Entregado"
         CANCELLED = "cancelled", "Cancelado"
+
+    class Source(models.TextChoices):
+        WHATSAPP = "whatsapp", "WhatsApp"
+        INSTAGRAM = "instagram", "Instagram"
+        FACEBOOK = "facebook", "Facebook"
+        REFERRAL = "referral", "Referido"
+        OTHER = "other", "Otro"
+
+    class DeliveryType(models.TextChoices):
+        PICKUP = "pickup", "Retiro en Asunción"
+        SHIPPING = "shipping", "Envío"
+
+    class PaymentMethod(models.TextChoices):
+        CASH = "cash", "Efectivo"
+        TRANSFER = "transfer", "Transferencia"
+        UENO = "ueno", "Ueno"
+        OTHER = "other", "Otro"
 
     customer = models.ForeignKey(
         Customer,
@@ -301,6 +323,33 @@ class Order(models.Model):
         max_length=20,
         choices=Status.choices,
         default=Status.DRAFT,
+    )
+    source = models.CharField(
+        "Canal de origen",
+        max_length=20,
+        choices=Source.choices,
+        blank=True,
+        default="",
+    )
+    delivery_type = models.CharField(
+        "Modalidad de entrega",
+        max_length=20,
+        choices=DeliveryType.choices,
+        default=DeliveryType.PICKUP,
+    )
+    delivery_city = models.CharField(
+        "Ciudad de entrega",
+        max_length=100,
+        blank=True,
+        default="",
+    )
+    discount_amount = models.PositiveIntegerField("Descuento (Gs.)", default=0)
+    payment_method = models.CharField(
+        "Método de pago",
+        max_length=20,
+        choices=PaymentMethod.choices,
+        blank=True,
+        default="",
     )
     notes = models.TextField("Notas", blank=True)
     created_by = models.ForeignKey(
@@ -323,12 +372,39 @@ class Order(models.Model):
 
     @property
     def total(self):
+        return max(self.subtotal - self.discount_amount, 0)
+
+    @property
+    def subtotal(self):
         return sum(line.total for line in self.lines.all())
+
+    def should_deduct_stock(self):
+        return self.status in {
+            self.Status.CONFIRMED,
+            self.Status.DEPOSIT,
+            self.Status.INVOICE_PENDING,
+            self.Status.DELIVERED,
+        }
 
     def confirm_lines(self):
         for line in self.lines.select_related("product"):
             line.snapshot_product()
             line.save(update_fields=["product_name", "product_code", "unit_price"])
+
+    def reconcile_stock(self):
+        if not self.pk:
+            return
+
+        if not self.should_deduct_stock():
+            self.release_stock()
+            return
+
+        for line in self.lines.select_related("product", "stock_reserved_product"):
+            line.reconcile_stock()
+
+    def release_stock(self):
+        for line in self.lines.select_related("stock_reserved_product"):
+            line.release_stock()
 
     def save(self, *args, **kwargs):
         was_confirmed = False
@@ -344,6 +420,8 @@ class Order(models.Model):
 
         if self.status == self.Status.CONFIRMED and not was_confirmed:
             self.confirm_lines()
+
+        self.reconcile_stock()
 
 
 class OrderLine(models.Model):
@@ -365,6 +443,18 @@ class OrderLine(models.Model):
     product_code = models.CharField("Código", max_length=50, blank=True)
     quantity = models.PositiveIntegerField("Cantidad")
     unit_price = models.PositiveIntegerField("Precio unitario", default=0)
+    stock_reserved_product = models.ForeignKey(
+        Product,
+        verbose_name="Producto reservado en stock",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    stock_reserved_quantity = models.PositiveIntegerField(
+        "Cantidad reservada en stock",
+        default=0,
+    )
 
     class Meta:
         ordering = ["id"]
@@ -384,6 +474,8 @@ class OrderLine(models.Model):
 
     @property
     def total(self):
+        if self.quantity is None:
+            return 0
         return self.quantity * self.effective_unit_price
 
     def snapshot_product(self):
@@ -402,6 +494,83 @@ class OrderLine(models.Model):
         ):
             self.snapshot_product()
         super().save(*args, **kwargs)
+
+        if self.order.should_deduct_stock():
+            self.reconcile_stock()
+
+    def reconcile_stock(self):
+        if not self.pk:
+            return
+
+        desired_product = self.product if self.product_id else None
+        desired_quantity = self.quantity or 0
+        reserved = (
+            OrderLine.objects.filter(pk=self.pk)
+            .values("stock_reserved_product_id", "stock_reserved_quantity")
+            .first()
+        )
+        reserved_product_id = (
+            reserved["stock_reserved_product_id"] if reserved else None
+        )
+        reserved_quantity = reserved["stock_reserved_quantity"] if reserved else 0
+
+        if reserved_product_id:
+            if reserved_product_id == getattr(desired_product, "pk", None):
+                delta = desired_quantity - reserved_quantity
+                if delta:
+                    Product.objects.filter(pk=reserved_product_id).update(
+                        stock=models.F("stock") - delta
+                    )
+            else:
+                Product.objects.filter(pk=reserved_product_id).update(
+                    stock=models.F("stock") + reserved_quantity
+                )
+                if desired_product and desired_quantity:
+                    Product.objects.filter(pk=desired_product.pk).update(
+                        stock=models.F("stock") - desired_quantity
+                    )
+        elif desired_product and desired_quantity:
+            Product.objects.filter(pk=desired_product.pk).update(
+                stock=models.F("stock") - desired_quantity
+            )
+
+        stock_reserved_product_id = desired_product.pk if desired_product else None
+        OrderLine.objects.filter(pk=self.pk).update(
+            stock_reserved_product_id=stock_reserved_product_id,
+            stock_reserved_quantity=desired_quantity if desired_product else 0,
+        )
+        self.stock_reserved_product_id = stock_reserved_product_id
+        self.stock_reserved_quantity = desired_quantity if desired_product else 0
+
+    def release_stock(self):
+        if not self.pk:
+            return
+
+        reserved = (
+            OrderLine.objects.filter(pk=self.pk)
+            .values("stock_reserved_product_id", "stock_reserved_quantity")
+            .first()
+        )
+        if not reserved:
+            return
+
+        reserved_product_id = reserved["stock_reserved_product_id"]
+        reserved_quantity = reserved["stock_reserved_quantity"]
+        if reserved_product_id and reserved_quantity:
+            Product.objects.filter(pk=reserved_product_id).update(
+                stock=models.F("stock") + reserved_quantity
+            )
+
+        OrderLine.objects.filter(pk=self.pk).update(
+            stock_reserved_product=None,
+            stock_reserved_quantity=0,
+        )
+        self.stock_reserved_product_id = None
+        self.stock_reserved_quantity = 0
+
+    def delete(self, *args, **kwargs):
+        self.release_stock()
+        return super().delete(*args, **kwargs)
 
 
 class PurchaseOrder(models.Model):
