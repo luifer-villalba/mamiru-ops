@@ -345,32 +345,32 @@ class ProductAdminImagePreviewTests(TestCase):
                 "thumbnail",
                 "code",
                 "name",
+                "category",
+                "supplier",
+                "status",
                 "stock",
                 "sale_price",
                 "cost_price",
                 "margin_percent",
-                "classification",
                 "visible_on_web",
                 "is_featured",
                 "display_priority",
-                "supplier",
-                "category",
-                "status",
+                "classification",
             ],
         )
 
     def test_product_admin_renders_price_sync_source_field(self):
         from catalog.admin import ProductAdmin
 
-        price_fields = ProductAdmin.fieldsets[5][1]["fields"]
+        price_fields = ProductAdmin.fieldsets[2][1]["fields"]
         self.assertIn("price_sync_source", price_fields)
 
     def test_product_admin_groups_web_fields(self):
         from catalog.admin import ProductAdmin
 
-        web_fields = ProductAdmin.fieldsets[2][1]["fields"]
-        detail_fields = ProductAdmin.fieldsets[3][1]["fields"]
-        care_fields = ProductAdmin.fieldsets[4][1]["fields"]
+        web_fields = ProductAdmin.fieldsets[3][1]["fields"]
+        detail_fields = ProductAdmin.fieldsets[4][1]["fields"]
+        care_fields = ProductAdmin.fieldsets[5][1]["fields"]
         seo_fields = ProductAdmin.fieldsets[7][1]["fields"]
 
         self.assertIn("visible_on_web", web_fields)

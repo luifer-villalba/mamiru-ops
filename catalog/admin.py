@@ -655,17 +655,17 @@ class ProductAdmin(ModelAdmin):
         "thumbnail",
         "code",
         "name",
+        "category",
+        "supplier",
+        "status",
         "stock",
         "sale_price",
         "cost_price",
         "margin_percent",
-        "classification",
         "visible_on_web",
         "is_featured",
         "display_priority",
-        "supplier",
-        "category",
-        "status",
+        "classification",
     ]
     list_filter = [
         StockLevelFilter,
@@ -695,6 +695,19 @@ class ProductAdmin(ModelAdmin):
             "Clasificación",
             {
                 "fields": ["category", "supplier", "material", "classification"],
+            },
+        ),
+        (
+            "Precios y stock",
+            {
+                "fields": [
+                    "cost_price",
+                    "wholesale_cost",
+                    "margin_percent",
+                    "sale_price",
+                    "price_sync_source",
+                    "stock",
+                ],
             },
         ),
         (
@@ -728,19 +741,6 @@ class ProductAdmin(ModelAdmin):
                     "is_water_resistant",
                     "is_hypoallergenic",
                     "care_instructions",
-                ],
-            },
-        ),
-        (
-            "Precios y stock",
-            {
-                "fields": [
-                    "cost_price",
-                    "wholesale_cost",
-                    "margin_percent",
-                    "sale_price",
-                    "price_sync_source",
-                    "stock",
                 ],
             },
         ),
