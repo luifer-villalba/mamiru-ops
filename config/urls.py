@@ -10,23 +10,26 @@ from django.views.static import serve
 def healthz(_request):
     return JsonResponse({"status": "ok"})
 
-urlpatterns = [
-    path("healthz/", healthz),
-    path("admin/", RedirectView.as_view(url=reverse_lazy("admin:index"), permanent=True)),
-    path("api/", include("catalog.urls")),
-    path("", RedirectView.as_view(url=reverse_lazy("admin:catalog_product_changelist"), permanent=False)),
-    path("", admin.site.urls),
-]
 
 media_url_path = settings.MEDIA_URL.strip("/")
+media_urlpatterns = []
 
 if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    media_urlpatterns = static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 elif settings.SERVE_MEDIA_FILES and media_url_path:
-    urlpatterns += [
+    media_urlpatterns = [
         re_path(
             rf"^{media_url_path}/(?P<path>.*)$",
             serve,
             {"document_root": settings.MEDIA_ROOT},
         )
     ]
+
+urlpatterns = [
+    path("healthz/", healthz),
+    path("admin/", RedirectView.as_view(url=reverse_lazy("admin:index"), permanent=True)),
+    path("api/", include("catalog.urls")),
+    *media_urlpatterns,
+    path("", RedirectView.as_view(url=reverse_lazy("admin:catalog_product_changelist"), permanent=False)),
+    path("", admin.site.urls),
+]

@@ -7,8 +7,9 @@ from django.contrib.auth import authenticate, get_user_model
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
-from django.urls import reverse
+from django.urls import clear_url_caches, resolve, reverse
 from django.utils import timezone
+from django.views.static import serve
 from PIL import Image
 
 from catalog.admin import (
@@ -104,6 +105,7 @@ class AdminHomeTests(TestCase):
             MEDIA_URL="/uploads/",
         ):
             reloaded_urls = reload(config.urls)
+            clear_url_caches()
 
             self.assertTrue(
                 any(
@@ -111,8 +113,10 @@ class AdminHomeTests(TestCase):
                     for pattern in reloaded_urls.urlpatterns
                 )
             )
+            self.assertEqual(resolve("/uploads/products/test.jpg").func, serve)
 
         reload(config.urls)
+        clear_url_caches()
 
 
 class ProductAdminImagePreviewTests(TestCase):
