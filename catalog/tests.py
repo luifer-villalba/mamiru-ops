@@ -271,6 +271,12 @@ class ProductAdminImagePreviewTests(TestCase):
             ProductAdmin.Media.js,
         )
 
+    def test_product_admin_loads_clickable_rows_script(self):
+        self.assertIn(
+            "catalog/js/admin_clickable_rows.js",
+            ProductAdmin.Media.js,
+        )
+
     def test_product_admin_uses_pagination(self):
         from catalog.admin import ProductAdmin
 
