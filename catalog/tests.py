@@ -380,6 +380,12 @@ class ProductAdminImagePreviewTests(TestCase):
             ProductAdmin.Media.js,
         )
 
+    def test_product_admin_loads_product_styles(self):
+        self.assertIn(
+            "catalog/css/product_admin.css",
+            ProductAdmin.Media.css["all"],
+        )
+
     def test_product_change_form_includes_preview_layout_styles(self):
         template = Path("templates/admin/catalog/product/change_form.html").read_text()
 

@@ -858,6 +858,7 @@ class ProductAdmin(ModelAdmin):
         )
 
     class Media:
+        css = {"all": ["catalog/css/product_admin.css"]}
         js = [
             "catalog/js/admin_clickable_rows.js",
             "catalog/js/product_price_format.js",

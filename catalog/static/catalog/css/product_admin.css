@@ -1,0 +1,9 @@
+.inline-group td.field-preview {
+    text-align: center;
+}
+
+.inline-group td.field-preview img,
+.inline-group td.field-preview [data-product-form-image-placeholder] {
+    display: block;
+    margin-inline: auto;
+}
