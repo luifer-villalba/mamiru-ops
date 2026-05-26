@@ -154,6 +154,21 @@ class ProductImage(models.Model):
                 pk=self.pk
             ).update(is_main=False)
 
+    def delete(self, *args, **kwargs):
+        image_name = self.image.name
+        storage = self.image.storage if image_name else None
+
+        result = super().delete(*args, **kwargs)
+
+        if storage and image_name:
+            try:
+                if storage.exists(image_name):
+                    storage.delete(image_name)
+            except OSError:
+                pass
+
+        return result
+
 
 class PriceHistory(models.Model):
     product = models.ForeignKey(

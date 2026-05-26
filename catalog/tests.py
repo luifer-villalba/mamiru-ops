@@ -173,6 +173,42 @@ class ProductAdminImagePreviewTests(TestCase):
         self.assertFalse(first_image.is_main)
         self.assertTrue(second_image.is_main)
 
+    @mock.patch("django.core.files.storage.FileSystemStorage.delete")
+    @mock.patch("django.core.files.storage.FileSystemStorage.exists", return_value=True)
+    def test_product_image_delete_removes_existing_file(
+        self,
+        storage_exists,
+        storage_delete,
+    ):
+        product_image = ProductImage.objects.create(
+            product=self.product,
+            image="products/delete-me.jpg",
+        )
+
+        product_image.delete()
+
+        self.assertFalse(ProductImage.objects.filter(pk=product_image.pk).exists())
+        storage_exists.assert_called_once_with("products/delete-me.jpg")
+        storage_delete.assert_called_once_with("products/delete-me.jpg")
+
+    @mock.patch("django.core.files.storage.FileSystemStorage.delete")
+    @mock.patch("django.core.files.storage.FileSystemStorage.exists", return_value=False)
+    def test_product_image_delete_ignores_missing_file(
+        self,
+        storage_exists,
+        storage_delete,
+    ):
+        product_image = ProductImage.objects.create(
+            product=self.product,
+            image="products/already-gone.jpg",
+        )
+
+        product_image.delete()
+
+        self.assertFalse(ProductImage.objects.filter(pk=product_image.pk).exists())
+        storage_exists.assert_called_once_with("products/already-gone.jpg")
+        storage_delete.assert_not_called()
+
     def test_image_form_accepts_expected_formats(self):
         buffer = BytesIO()
         Image.new("RGB", (1, 1), color="white").save(buffer, format="PNG")
@@ -212,10 +248,22 @@ class ProductAdminImagePreviewTests(TestCase):
         self.assertIn("La imagen debe ser JPEG, PNG, WebP.", form.errors["image"])
 
     def test_image_validation_rejects_large_files(self):
-        image = mock.Mock(content_type="image/png", size=(5 * 1024 * 1024) + 1)
+        image = SimpleUploadedFile(
+            "grande.png",
+            b"x" * ((5 * 1024 * 1024) + 1),
+            content_type="image/png",
+        )
 
         with self.assertRaisesMessage(ValidationError, "La imagen no puede superar"):
             validate_product_image_upload(image)
+
+    def test_image_validation_ignores_existing_image_fields(self):
+        product_image = ProductImage.objects.create(
+            product=self.product,
+            image="products/missing.jpg",
+        )
+
+        validate_product_image_upload(product_image.image)
 
     def test_product_admin_loads_live_preview_script(self):
         self.assertIn(

@@ -7,6 +7,7 @@ from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import Group, User
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.files.uploadedfile import UploadedFile
 from django.db import transaction
 from django.db.models import F, Q
 from django.http import JsonResponse
@@ -65,7 +66,12 @@ def product_image_url(image):
     if not image or not image.image:
         return ""
 
-    if not image.image.storage.exists(image.image.name):
+    try:
+        image_exists = image.image.storage.exists(image.image.name)
+    except OSError:
+        image_exists = False
+
+    if not image_exists:
         return ""
 
     return image.image.url
@@ -73,6 +79,9 @@ def product_image_url(image):
 
 def validate_product_image_upload(image):
     if not image:
+        return
+
+    if not isinstance(image, UploadedFile):
         return
 
     content_type = getattr(image, "content_type", "")
