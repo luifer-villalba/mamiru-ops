@@ -36,7 +36,7 @@ class ProductSerializer(serializers.ModelSerializer):
             "category",
             "supplier",
             "material",
-            "product_type",
+            "classification",
             "cost_price",
             "wholesale_cost",
             "margin_percent",

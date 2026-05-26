@@ -44,6 +44,11 @@ class Product(models.Model):
         SOLD_OUT = "sold_out", "Sin stock"
         HIDDEN = "hidden", "Oculto"
 
+    class Classification(models.TextChoices):
+        SIGNATURE = "A", "A / Signature"
+        ESSENTIALS = "B", "B / Essentials"
+        BIJOU = "C", "C / Bijou"
+
     code = models.CharField("Código", max_length=50, unique=True, blank=True)
     name = models.CharField("Nombre", max_length=300)
     slug = models.SlugField("Slug", max_length=300, unique=True)
@@ -60,7 +65,12 @@ class Product(models.Model):
         related_name="products",
     )
     material = models.CharField("Material", max_length=200, blank=True)
-    product_type = models.CharField("Tipo de producto", max_length=200, blank=True)
+    classification = models.CharField(
+        "Clasificación",
+        max_length=1,
+        choices=Classification.choices,
+        default=Classification.ESSENTIALS,
+    )
     cost_price = models.PositiveIntegerField("Costo", default=0)
     wholesale_cost = models.PositiveIntegerField(
         "Costo mayorista", null=True, blank=True

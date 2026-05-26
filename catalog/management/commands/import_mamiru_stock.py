@@ -118,7 +118,6 @@ class Command(BaseCommand):
                         or row.get("Categoria", "")
                     )
                     material = clean_text(row.get("Material", ""))
-                    product_type = clean_text(row.get("Tipo", ""))
                     supplier_name = clean_text(row.get("Proveedor", ""))
                     cost_raw = row.get("Costo", "")
                     wholesale_raw = row.get("Costo Mayorista", "")
@@ -174,7 +173,6 @@ class Command(BaseCommand):
                         product.category = category
                         product.supplier = supplier
                         product.material = material
-                        product.product_type = product_type
                         product.cost_price = cost_price
                         product.wholesale_cost = wholesale_cost
                         product.margin_percent = margin_percent
@@ -191,7 +189,6 @@ class Command(BaseCommand):
                             category=category,
                             supplier=supplier,
                             material=material,
-                            product_type=product_type,
                             cost_price=cost_price,
                             wholesale_cost=wholesale_cost,
                             margin_percent=margin_percent,

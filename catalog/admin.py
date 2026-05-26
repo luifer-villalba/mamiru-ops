@@ -148,6 +148,7 @@ def product_lookup_view(request):
             "cost_price": product.cost_price,
             "sale_price": product.sale_price,
             "stock": product.stock,
+            "classification": product.classification,
             "thumbnail_url": main_image_url(product),
             "margin_percent": (
                 str(product.margin_percent)
@@ -179,6 +180,7 @@ def product_search_view(request):
                     "cost_price": product.cost_price,
                     "sale_price": product.sale_price,
                     "stock": product.stock,
+                    "classification": product.classification,
                     "thumbnail_url": main_image_url(product),
                     "margin_percent": (
                         str(product.margin_percent)
@@ -657,11 +659,12 @@ class ProductAdmin(ModelAdmin):
         "sale_price",
         "cost_price",
         "margin_percent",
+        "classification",
         "supplier",
         "category",
         "status",
     ]
-    list_filter = [StockLevelFilter, "category", "supplier", "status"]
+    list_filter = [StockLevelFilter, "classification", "category", "supplier", "status"]
     list_per_page = 25
     ordering = ["code", "name"]
     search_fields = ["code", "name"]
@@ -680,7 +683,7 @@ class ProductAdmin(ModelAdmin):
         (
             "Clasificación",
             {
-                "fields": ["category", "supplier", "material", "product_type"],
+                "fields": ["category", "supplier", "material", "classification"],
             },
         ),
         (
