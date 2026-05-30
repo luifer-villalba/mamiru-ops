@@ -208,9 +208,23 @@
                 return document.getElementById(fieldId);
             })
             .filter(Boolean);
+        const costField = document.getElementById(costFieldId);
+        const wholesaleCostField = document.getElementById(wholesaleCostFieldId);
+        const marginField = document.getElementById(marginFieldId);
+        const salePriceField = document.getElementById(salePriceFieldId);
 
         fields.forEach(setupField);
         setupPriceCalculator();
+
+        if (costField && marginField && salePriceField) {
+            updateMarginFromSalePrice(
+                costField,
+                wholesaleCostField,
+                marginField,
+                salePriceField,
+            );
+        }
+
         setupFormSubmitSanitizer(fields);
     }
 

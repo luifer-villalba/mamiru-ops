@@ -602,6 +602,20 @@ class ProductAdminFormPriceSyncTests(TestCase):
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(form.cleaned_data["sale_price"], 60000)
 
+    def test_blank_sync_source_defaults_to_margin_from_sale_price(self):
+        form = ProductAdminForm(
+            data=self.form_data(
+                cost_price="38000",
+                wholesale_cost="34200",
+                margin_percent="30",
+                sale_price="44460",
+                price_sync_source="",
+            )
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["margin_percent"], Decimal("23.08"))
+
 
 class ProductWebFieldsTests(TestCase):
     def setUp(self):

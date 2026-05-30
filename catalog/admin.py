@@ -472,12 +472,7 @@ class ProductAdminForm(forms.ModelForm):
         if not margin_base_cost:
             return cleaned_data
 
-        if sync_source == "sale_price" and sale_price is not None:
-            cleaned_data["margin_percent"] = calculate_margin_percent(
-                margin_base_cost,
-                sale_price,
-            )
-        elif margin_percent is not None:
+        if sync_source == "margin_percent" and margin_percent is not None:
             cleaned_data["sale_price"] = calculate_sale_price(
                 margin_base_cost,
                 margin_percent,
@@ -486,6 +481,11 @@ class ProductAdminForm(forms.ModelForm):
             cleaned_data["margin_percent"] = calculate_margin_percent(
                 margin_base_cost,
                 sale_price,
+            )
+        elif margin_percent is not None:
+            cleaned_data["sale_price"] = calculate_sale_price(
+                margin_base_cost,
+                margin_percent,
             )
 
         return cleaned_data
