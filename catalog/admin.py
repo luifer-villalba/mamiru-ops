@@ -881,7 +881,7 @@ class ProductAdmin(ModelAdmin):
         css = {"all": ["catalog/css/product_admin.css"]}
         js = [
             "catalog/js/admin_clickable_rows.js",
-            "catalog/js/product_price_format.js",
+            "catalog/js/product_price_format_v2.js",
             "catalog/js/product_image_preview.js",
         ]
 
