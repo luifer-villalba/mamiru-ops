@@ -53,15 +53,20 @@
     }
 
     function calculateSalePrice(cost, marginPercent) {
-        return roundUpToHundred(cost * (1 + marginPercent / 100));
-    }
-
-    function calculateMarginPercent(cost, salePrice) {
-        if (!cost) {
+        const multiplier = 1 - marginPercent / 100;
+        if (multiplier <= 0) {
             return null;
         }
 
-        return ((salePrice - cost) / cost) * 100;
+        return roundUpToHundred(cost / multiplier);
+    }
+
+    function calculateMarginPercent(cost, salePrice) {
+        if (!salePrice) {
+            return null;
+        }
+
+        return ((salePrice - cost) / salePrice) * 100;
     }
 
     function updateSalePriceFromMargin(costField, marginField, salePriceField) {
@@ -71,13 +76,14 @@
 
         const cost = parseIntegerField(costField);
         const marginPercent = parseDecimalField(marginField);
-        if (cost === null || marginPercent === null) {
+        const salePrice = calculateSalePrice(cost, marginPercent);
+        if (cost === null || marginPercent === null || salePrice === null) {
             return;
         }
 
         syncingCalculatedFields = true;
         setPriceSyncSource("margin_percent");
-        salePriceField.value = formatGuarani(String(calculateSalePrice(cost, marginPercent)));
+        salePriceField.value = formatGuarani(String(salePrice));
         syncingCalculatedFields = false;
     }
 

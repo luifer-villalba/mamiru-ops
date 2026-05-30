@@ -572,7 +572,7 @@ class ProductAdminFormPriceSyncTests(TestCase):
         )
 
         self.assertTrue(form.is_valid(), form.errors)
-        self.assertEqual(form.cleaned_data["margin_percent"], Decimal("63.64"))
+        self.assertEqual(form.cleaned_data["margin_percent"], Decimal("38.89"))
 
 
 class ProductWebFieldsTests(TestCase):

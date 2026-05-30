@@ -101,16 +101,19 @@ def round_up_to_hundred(value):
 
 
 def calculate_sale_price(cost_price, margin_percent):
-    multiplier = Decimal("1") + (Decimal(margin_percent) / Decimal("100"))
-    return round_up_to_hundred(Decimal(cost_price) * multiplier)
+    margin_ratio = Decimal(margin_percent) / Decimal("100")
+    multiplier = Decimal("1") - margin_ratio
+    if multiplier <= 0:
+        raise ValidationError("Margen % debe ser menor a 100.")
+    return round_up_to_hundred(Decimal(cost_price) / multiplier)
 
 
 def calculate_margin_percent(cost_price, sale_price):
-    if not cost_price:
+    if not sale_price:
         return None
 
     margin = (
-        (Decimal(sale_price) - Decimal(cost_price)) / Decimal(cost_price)
+        (Decimal(sale_price) - Decimal(cost_price)) / Decimal(sale_price)
     ) * Decimal("100")
     return margin.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 

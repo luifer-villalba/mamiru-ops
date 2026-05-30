@@ -751,7 +751,7 @@
         return;
       }
 
-      marginField.value = formatPercent(((price - cost) / cost) * 100);
+      marginField.value = formatPercent(((price - cost) / price) * 100);
     };
 
     const renderSearchResults = (products) => {
