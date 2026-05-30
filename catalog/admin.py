@@ -463,26 +463,28 @@ class ProductAdminForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
         cost_price = cleaned_data.get("cost_price")
+        wholesale_cost = cleaned_data.get("wholesale_cost")
         margin_percent = cleaned_data.get("margin_percent")
         sale_price = cleaned_data.get("sale_price")
         sync_source = cleaned_data.get("price_sync_source")
+        margin_base_cost = wholesale_cost or cost_price
 
-        if not cost_price:
+        if not margin_base_cost:
             return cleaned_data
 
         if sync_source == "sale_price" and sale_price is not None:
             cleaned_data["margin_percent"] = calculate_margin_percent(
-                cost_price,
+                margin_base_cost,
                 sale_price,
             )
         elif margin_percent is not None:
             cleaned_data["sale_price"] = calculate_sale_price(
-                cost_price,
+                margin_base_cost,
                 margin_percent,
             )
         elif sale_price is not None:
             cleaned_data["margin_percent"] = calculate_margin_percent(
-                cost_price,
+                margin_base_cost,
                 sale_price,
             )
 

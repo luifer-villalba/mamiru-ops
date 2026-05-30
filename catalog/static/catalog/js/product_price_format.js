@@ -1,6 +1,7 @@
 (function () {
     const priceFieldIds = ["id_cost_price", "id_wholesale_cost", "id_sale_price"];
     const costFieldId = "id_cost_price";
+    const wholesaleCostFieldId = "id_wholesale_cost";
     const marginFieldId = "id_margin_percent";
     const salePriceFieldId = "id_sale_price";
     const priceSyncSourceFieldId = "id_price_sync_source";
@@ -69,15 +70,28 @@
         return ((salePrice - cost) / salePrice) * 100;
     }
 
-    function updateSalePriceFromMargin(costField, marginField, salePriceField) {
+    function getMarginBaseCost(costField, wholesaleCostField) {
+        const wholesaleCost = parseIntegerField(wholesaleCostField);
+        if (wholesaleCost !== null) {
+            return wholesaleCost;
+        }
+
+        return parseIntegerField(costField);
+    }
+
+    function updateSalePriceFromMargin(costField, wholesaleCostField, marginField, salePriceField) {
         if (syncingCalculatedFields) {
             return;
         }
 
-        const cost = parseIntegerField(costField);
+        const cost = getMarginBaseCost(costField, wholesaleCostField);
         const marginPercent = parseDecimalField(marginField);
+        if (cost === null || marginPercent === null) {
+            return;
+        }
+
         const salePrice = calculateSalePrice(cost, marginPercent);
-        if (cost === null || marginPercent === null || salePrice === null) {
+        if (salePrice === null) {
             return;
         }
 
@@ -87,13 +101,17 @@
         syncingCalculatedFields = false;
     }
 
-    function updateMarginFromSalePrice(costField, marginField, salePriceField) {
+    function updateMarginFromSalePrice(costField, wholesaleCostField, marginField, salePriceField) {
         if (syncingCalculatedFields) {
             return;
         }
 
-        const cost = parseIntegerField(costField);
+        const cost = getMarginBaseCost(costField, wholesaleCostField);
         const salePrice = parseIntegerField(salePriceField);
+        if (cost === null) {
+            return;
+        }
+
         const marginPercent = calculateMarginPercent(cost, salePrice);
         if (marginPercent === null) {
             return;
@@ -149,6 +167,7 @@
 
     function setupPriceCalculator() {
         const costField = document.getElementById(costFieldId);
+        const wholesaleCostField = document.getElementById(wholesaleCostFieldId);
         const marginField = document.getElementById(marginFieldId);
         const salePriceField = document.getElementById(salePriceFieldId);
 
@@ -157,23 +176,29 @@
         }
 
         costField.addEventListener("blur", function () {
-            updateSalePriceFromMargin(costField, marginField, salePriceField);
+            updateSalePriceFromMargin(costField, wholesaleCostField, marginField, salePriceField);
+        });
+
+        if (wholesaleCostField) {
+            wholesaleCostField.addEventListener("blur", function () {
+                updateSalePriceFromMargin(costField, wholesaleCostField, marginField, salePriceField);
+            });
         });
 
         marginField.addEventListener("input", function () {
-            updateSalePriceFromMargin(costField, marginField, salePriceField);
+            updateSalePriceFromMargin(costField, wholesaleCostField, marginField, salePriceField);
         });
 
         marginField.addEventListener("blur", function () {
-            updateSalePriceFromMargin(costField, marginField, salePriceField);
+            updateSalePriceFromMargin(costField, wholesaleCostField, marginField, salePriceField);
         });
 
         salePriceField.addEventListener("input", function () {
-            updateMarginFromSalePrice(costField, marginField, salePriceField);
+            updateMarginFromSalePrice(costField, wholesaleCostField, marginField, salePriceField);
         });
 
         salePriceField.addEventListener("blur", function () {
-            updateMarginFromSalePrice(costField, marginField, salePriceField);
+            updateMarginFromSalePrice(costField, wholesaleCostField, marginField, salePriceField);
         });
     }
 
